@@ -53,7 +53,7 @@ export default defineConfig({
   },
   server: {
     host: true, // Listen on all addresses
-    port: 5173,
+    port: 5174,
     strictPort: true,
     allowedHosts: true, // Allow all hosts (like evolution-hub)
     cors: true, // Enable CORS for ngrok
