@@ -145,6 +145,7 @@ const ChatSidebar = ({
         page?: number;
         total_pages?: number;
         has_next_page?: boolean;
+        total?: number;
       } | null;
     };
     getUnreadCount: (conversationId: string) => number;
@@ -158,6 +159,7 @@ const ChatSidebar = ({
   const [activeTab, setActiveTab] = useState<'open' | 'pending' | 'resolved'>('open');
   const sidebarScrollRef = useRef<HTMLDivElement | null>(null);
   const loadingMoreRef = useRef(false);
+  const lastScrollTimeRef = useRef<number>(0);
 
   useEffect(() => {
     onClearSelection();
@@ -595,6 +597,9 @@ const ChatSidebar = ({
   const hasNextPage = pagination?.has_next_page ?? currentPage < totalPages;
 
   const handleSidebarScroll = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastScrollTimeRef.current < 150) return;
+
     const container = sidebarScrollRef.current;
     if (!container || loadingMoreRef.current) return;
 
@@ -609,26 +614,23 @@ const ChatSidebar = ({
     const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     if (distanceToBottom > 120) return;
 
+    // Update throttle timestamp only after confirming we are near the bottom
+    lastScrollTimeRef.current = now;
     loadingMoreRef.current = true;
     setIsLoadingMoreConversations(true);
 
-    // Save scroll position before loading — the re-sort in visibleConversations
-    // causes a DOM restructure that resets scrollTop to 0.
     const scrollTop = container.scrollTop;
-    const scrollHeight = container.scrollHeight;
 
     try {
       await conversations.loadMoreConversations();
     } finally {
       setIsLoadingMoreConversations(false);
-      loadingMoreRef.current = false;
-
-      // Restore scroll position after React re-renders the appended list
+      // Release lock inside RAF so the scroll restoration fires before new events can re-enter
       requestAnimationFrame(() => {
         if (sidebarScrollRef.current) {
-          const newScrollHeight = sidebarScrollRef.current.scrollHeight;
-          sidebarScrollRef.current.scrollTop = scrollTop + (newScrollHeight - scrollHeight);
+          sidebarScrollRef.current.scrollTop = scrollTop;
         }
+        loadingMoreRef.current = false;
       });
     }
   }, [conversations]);
@@ -638,7 +640,6 @@ const ChatSidebar = ({
 
     const container = sidebarScrollRef.current;
     const savedScrollTop = container?.scrollTop ?? 0;
-    const savedScrollHeight = container?.scrollHeight ?? 0;
 
     loadingMoreRef.current = true;
     setIsLoadingMoreConversations(true);
@@ -646,13 +647,11 @@ const ChatSidebar = ({
       await conversations.loadMoreConversations();
     } finally {
       setIsLoadingMoreConversations(false);
-      loadingMoreRef.current = false;
-
       requestAnimationFrame(() => {
         if (sidebarScrollRef.current) {
-          const newScrollHeight = sidebarScrollRef.current.scrollHeight;
-          sidebarScrollRef.current.scrollTop = savedScrollTop + (newScrollHeight - savedScrollHeight);
+          sidebarScrollRef.current.scrollTop = savedScrollTop;
         }
+        loadingMoreRef.current = false;
       });
     }
   }, [conversations, hasNextPage, isLoadingMoreConversations]);
@@ -1055,8 +1054,8 @@ const ChatSidebar = ({
         {/* Filter Actions */}
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            {visibleConversations.length}{' '}
-            {visibleConversations.length === 1
+            {(conversations.state.conversationsPagination?.total ?? visibleConversations.length)}{' '}
+            {(conversations.state.conversationsPagination?.total ?? visibleConversations.length) === 1
               ? t('chatSidebar.conversation')
               : t('chatSidebar.conversations')}
           </span>
