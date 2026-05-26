@@ -22,6 +22,7 @@ import type { Pipeline } from '@/types/analytics';
 import { contactsService } from '@/services/contacts';
 import { Contact, Conversation } from '@/types/chat/api';
 import { mergeFullContact } from '@/utils/chat/contactTimestamp';
+import type { ContactConversation } from '@/types/contacts';
 
 interface ContactSidebarProps {
   isOpen: boolean;
@@ -94,6 +95,9 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   const [conversationPipelines, setConversationPipelines] = useState<Pipeline[]>([]);
   const [isLoadingPipelines, setIsLoadingPipelines] = useState(false);
   const [enrichedContact, setEnrichedContact] = useState<Contact | null>(null);
+  const [previousConversations, setPreviousConversations] = useState<ContactConversation[]>([]);
+  const [isLoadingPreviousConvs, setIsLoadingPreviousConvs] = useState(false);
+  const [previousConvsLoaded, setPreviousConvsLoaded] = useState(false);
 
   const contactRef = useRef(contact);
   useEffect(() => {
@@ -172,6 +176,38 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   useEffect(() => {
     loadConversationPipelines();
   }, [loadConversationPipelines]);
+
+  // Reset previous conversations when contact changes
+  useEffect(() => {
+    setPreviousConversations([]);
+    setPreviousConvsLoaded(false);
+    setShowPreviousConversations(false);
+  }, [contact?.id]);
+
+  // Load previous conversations when section is opened
+  const loadPreviousConversations = useCallback(async () => {
+    const contactId = contact?.id;
+    if (!contactId || isLoadingPreviousConvs || previousConvsLoaded) return;
+    setIsLoadingPreviousConvs(true);
+    try {
+      const response = await contactsService.getContactConversations(contactId);
+      const data = response?.data ?? (Array.isArray(response) ? response : []);
+      setPreviousConversations(data);
+    } catch (err) {
+      console.error('[ContactSidebar] Failed to load previous conversations:', err);
+      setPreviousConversations([]);
+    } finally {
+      setIsLoadingPreviousConvs(false);
+      setPreviousConvsLoaded(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contact?.id, previousConvsLoaded]);
+
+  useEffect(() => {
+    if (showPreviousConversations) {
+      loadPreviousConversations();
+    }
+  }, [showPreviousConversations, loadPreviousConversations]);
 
   // Handler para recarregar pipelines quando houver atualização
   const handlePipelineUpdated = useCallback(async () => {
@@ -367,7 +403,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                 title={t('contactSidebar.sections.previousConversations.title')}
                 description={t('contactSidebar.sections.previousConversations.description')}
                 icon={<MessageSquare className="h-4 w-4 text-purple-500" />}
-                count={0}
+                count={previousConvsLoaded ? previousConversations.length : undefined}
                 isOpen={showPreviousConversations}
                 onToggle={() => setShowPreviousConversations(!showPreviousConversations)}
               />
@@ -375,10 +411,57 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
 
             {showPreviousConversations && (
               <CardContent className="pt-0 px-3 pb-3">
-                <div className="text-sm text-muted-foreground p-2 rounded bg-muted/30">
-                  {/* TODO: Implementar ContactConversations real */}
-                  {t('contactSidebar.sections.previousConversations.loading')}
-                </div>
+                {isLoadingPreviousConvs ? (
+                  <div className="text-sm text-muted-foreground p-2 rounded bg-muted/30 text-center">
+                    {t('contactSidebar.sections.previousConversations.loading')}
+                  </div>
+                ) : previousConversations.length === 0 ? (
+                  <div className="text-sm text-muted-foreground p-2 rounded bg-muted/30 text-center">
+                    Nenhuma conversa anterior encontrada
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-thin pr-1">
+                    {previousConversations
+                      .filter(c => c.id !== conversation?.id)
+                      .map(c => {
+                        const statusColors: Record<string, string> = {
+                          open: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+                          resolved: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+                          pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+                        };
+                        const statusLabels: Record<string, string> = {
+                          open: 'Aberta',
+                          resolved: 'Resolvida',
+                          pending: 'Pendente',
+                        };
+                        const colorClass = statusColors[c.status] ?? statusColors.pending;
+                        const statusLabel = statusLabels[c.status] ?? c.status;
+                        const date = c.last_activity_at
+                          ? new Date(c.last_activity_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+                          : '';
+                        return (
+                          <a
+                            key={c.id}
+                            href={`/conversations/${c.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors text-xs no-underline"
+                          >
+                            <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                              <span className="font-medium truncate">{c.inbox?.name ?? 'Inbox'}</span>
+                              {c.assignee?.name && (
+                                <span className="text-muted-foreground truncate">{c.assignee.name}</span>
+                              )}
+                              <span className="text-muted-foreground">{date}</span>
+                            </div>
+                            <span className={`ml-2 flex-shrink-0 px-1.5 py-0.5 rounded text-xs font-medium ${colorClass}`}>
+                              {statusLabel}
+                            </span>
+                          </a>
+                        );
+                      })}
+                  </div>
+                )}
               </CardContent>
             )}
           </Card>
