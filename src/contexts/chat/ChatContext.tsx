@@ -394,15 +394,22 @@ function useChatIntegration() {
               description: cleanContent,
             });
 
-            // Play notification sound if enabled and conversation is assigned to current user
+            // Play notification sound if enabled
             if (currentUser) {
-              const isAssignedToMe = conversation.assignee_id === currentUser.id;
+              const audioSettings = getAudioSettings();
 
-              if (isAssignedToMe) {
-                const audioSettings = getAudioSettings();
+              if (audioSettings.enable_audio_alerts) {
+                const isAssignedToMe = conversation.assignee_id === currentUser.id;
+                const isUnassigned = !conversation.assignee_id;
 
-                if (audioSettings.enable_audio_alerts) {
-                  // Play sound for assigned conversations when conversation is closed
+                // Tocar som se a conversa for atribuída a mim, ou se for sem atribuição
+                // e a opção "alertar apenas atribuídas" estiver desativada.
+                const shouldAlert =
+                  isAssignedToMe ||
+                  (isUnassigned && !audioSettings.alert_if_unread_assigned_conversation_exist);
+
+                if (shouldAlert) {
+                  // Play sound for conversations when conversation is closed
                   setTimeout(() => {
                     playNotificationSound(audioSettings, () => true).catch(error => {
                       console.error('❌ Error playing notification sound for new message:', error);
