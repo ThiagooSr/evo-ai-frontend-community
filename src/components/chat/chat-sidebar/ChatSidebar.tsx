@@ -47,7 +47,7 @@ import {
   mediaTypeFromAttributes,
   senderNameFromAttributes,
 } from '@/utils/chat/mediaLabels';
-import { formatConversationTime, formatDetailedTime } from '@/utils/time/timeHelpers';
+import { formatConversationTime, formatDetailedTime, normalizeToUnixSeconds } from '@/utils/time/timeHelpers';
 import { isPhoneBearingChannel } from '@/utils/channelUtils';
 import { formatContactPhone } from '@/utils/contact/formatContactPhone';
 import { ConversationSkeleton } from '../loading-states';
@@ -663,22 +663,12 @@ const ChatSidebar = ({
     });
 
     const getSortTimestamp = (conversation: Conversation) => {
-      if (typeof conversation.timestamp === 'number') {
-        return conversation.timestamp;
-      }
-      const activityTime = Date.parse(conversation.last_activity_at || '');
-      if (!Number.isNaN(activityTime)) {
-        return activityTime;
-      }
-      const updatedTime = Date.parse(conversation.updated_at || '');
-      if (!Number.isNaN(updatedTime)) {
-        return updatedTime;
-      }
-      const createdTime = Date.parse(conversation.created_at || '');
-      if (!Number.isNaN(createdTime)) {
-        return createdTime;
-      }
-      return 0;
+      return normalizeToUnixSeconds(
+        conversation.last_activity_at ||
+        conversation.timestamp ||
+        conversation.updated_at ||
+        conversation.created_at
+      );
     };
 
     return [...filtered].sort((a, b) => {
