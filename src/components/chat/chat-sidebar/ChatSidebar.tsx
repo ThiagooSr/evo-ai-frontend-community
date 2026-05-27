@@ -1280,12 +1280,14 @@ const ChatSidebar = ({
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
                       {(() => {
-                        // ðŸ"µ INDICADOR PADRÃƒO: Bolinha pequena seguindo padrÃ£o do sistema
-                        const hasUnreadMessages =
-                          (conversations.getUnreadCount(conversation.id) || 0) > 0;
-
-                        return hasUnreadMessages ? (
-                          <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+                        const unreadCount = conversations.getUnreadCount(conversation.id) || 0;
+                        return unreadCount > 0 ? (
+                          <div className="relative flex items-center justify-center flex-shrink-0 animate-in zoom-in-50 duration-200" title={`${unreadCount} mensagens não lidas`}>
+                            <MessageCircle className="h-5 w-5 text-primary fill-primary" />
+                            <span className="absolute text-[9px] font-extrabold text-white mb-0.5 leading-none">
+                              {unreadCount > 9 ? '9+' : unreadCount}
+                            </span>
+                          </div>
                         ) : null;
                       })()}
                     </div>
