@@ -175,8 +175,8 @@ function useChatIntegration() {
   // 🔧 FIX: Ordenar conversas por last_activity_at para garantir ordem correta em tempo real
   const filteredConversations = useMemo(() => {
     return [...conversations.state.conversations].sort((a, b) => {
-      const aTime = new Date(a.last_activity_at || a.created_at).getTime();
-      const bTime = new Date(b.last_activity_at || b.created_at).getTime();
+      const aTime = normalizeToUnixSeconds(a.last_activity_at || a.created_at);
+      const bTime = normalizeToUnixSeconds(b.last_activity_at || b.created_at);
       return bTime - aTime; // Mais recente primeiro
     });
   }, [conversations.state.conversations]);

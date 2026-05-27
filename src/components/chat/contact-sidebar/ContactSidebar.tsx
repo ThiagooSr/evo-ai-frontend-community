@@ -21,7 +21,7 @@ import type { Pipeline } from '@/types/analytics';
 
 import { contactsService } from '@/services/contacts';
 import { Contact, Conversation } from '@/types/chat/api';
-import { mergeFullContact } from '@/utils/chat/contactTimestamp';
+import { mergeFullContact, unixTimestampToIso } from '@/utils/chat/contactTimestamp';
 import type { ContactConversation } from '@/types/contacts';
 
 interface ContactSidebarProps {
@@ -436,8 +436,9 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                         };
                         const colorClass = statusColors[c.status] ?? statusColors.pending;
                         const statusLabel = statusLabels[c.status] ?? c.status;
-                        const date = c.last_activity_at
-                          ? new Date(c.last_activity_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+                        const isoDate = unixTimestampToIso(c.last_activity_at);
+                        const date = isoDate
+                          ? new Date(isoDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
                           : '';
                         return (
                           <a
