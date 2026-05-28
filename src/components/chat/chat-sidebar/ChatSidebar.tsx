@@ -166,13 +166,8 @@ const ChatSidebar = ({
   }, [activeTab, onClearSelection]);
 
   // 🔑 BUG FIX: Ao trocar de aba, buscar conversas com o status correto da API
-  // Sem isso, a aba 'Aguardando' filtra client-side sobre a lista de 'open' → sempre 0 resultados
   useEffect(() => {
-    const hasActiveFilters = chatContext.filters.state.activeFilters.length > 0;
-    const isSearching = chatContext.filters.state.searchTerm?.trim().length > 0;
-    if (!hasActiveFilters && !isSearching) {
-      conversations.loadConversations({ status: activeTab });
-    }
+    conversations.loadConversations({ status: activeTab });
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pipeline state

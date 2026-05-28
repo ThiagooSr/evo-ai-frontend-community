@@ -735,13 +735,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   return (
     <WebSocketProvider>
       <UIProvider>
-        <ConversationsProvider>
-          <MessagesProvider>
-            <FiltersProvider>
+        <FiltersProvider>
+          <ConversationsProvider>
+            <MessagesProvider>
               <ChatProviderInternal>{children}</ChatProviderInternal>
-            </FiltersProvider>
-          </MessagesProvider>
-        </ConversationsProvider>
+            </MessagesProvider>
+          </ConversationsProvider>
+        </FiltersProvider>
       </UIProvider>
     </WebSocketProvider>
   );

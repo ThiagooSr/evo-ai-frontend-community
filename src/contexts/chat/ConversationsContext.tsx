@@ -5,6 +5,14 @@ import { conversationsReducer } from '@/contexts/chat/ConversationsContextReduce
 import { ConversationsContext } from '@/contexts/chat/ConversationsContextInstance';
 
 import { useLanguage } from '@/hooks/useLanguage';
+import { useFilters } from '@/contexts/chat/FiltersContext';
+import {
+  convertFiltersToApiFormat,
+  convertFiltersToUrlParams,
+  shouldUseAdvancedFilters,
+  createSearchFilter,
+  combineSearchWithFilters,
+} from '@/utils/chat/filterConverters';
 
 import { chatService } from '@/services/chat/chatService';
 import { conversationAPI } from '@/services/conversations/conversationService';
@@ -21,6 +29,7 @@ import { matchesConversationId } from '@/utils/chat/conversationMatcher';
 
 export function ConversationsProvider({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage('chat');
+  const { state: filtersState } = useFilters();
   const [state, dispatch] = useReducer(conversationsReducer, initialState);
 
   // Refs para evitar chamadas múltiplas simultâneas
@@ -53,7 +62,59 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       try {
         const requestedPage = Number(params?.page || 1);
         const shouldAppend = requestedPage > 1;
-        const response = await chatService.getConversations(params);
+
+        const activeFilters = filtersState.activeFilters;
+        const searchTerm = filtersState.searchTerm;
+
+        // Construir filtros mesclando o status atual se houver
+        const statusParam = params?.status;
+        let finalFilters = [...activeFilters];
+        if (statusParam && statusParam !== 'all' && !finalFilters.some(f => f.attribute_key === 'status')) {
+          finalFilters.push({
+            attribute_key: 'status',
+            filter_operator: 'equal_to',
+            values: [statusParam],
+            query_operator: 'and',
+          });
+        }
+
+        let response;
+        if (searchTerm && searchTerm.trim().length > 0) {
+          if (finalFilters.length > 0 && shouldUseAdvancedFilters(finalFilters)) {
+            const filterRequest = {
+              ...convertFiltersToApiFormat(finalFilters),
+              q: searchTerm,
+              page: requestedPage,
+            };
+            response = await chatService.filterConversations(filterRequest);
+          } else {
+            const filterParams = finalFilters.length > 0 ? convertFiltersToUrlParams(finalFilters) : {};
+            const searchParams = createSearchFilter(searchTerm);
+            const combined = combineSearchWithFilters(searchParams, filterParams);
+            response = await chatService.getConversations({
+              ...combined,
+              ...params,
+              page: requestedPage,
+            });
+          }
+        } else if (finalFilters.length > 0) {
+          if (shouldUseAdvancedFilters(finalFilters)) {
+            const filterRequest = {
+              ...convertFiltersToApiFormat(finalFilters),
+              page: requestedPage,
+            };
+            response = await chatService.filterConversations(filterRequest);
+          } else {
+            const filterParams = convertFiltersToUrlParams(finalFilters);
+            response = await chatService.getConversations({
+              ...filterParams,
+              ...params,
+              page: requestedPage,
+            });
+          }
+        } else {
+          response = await chatService.getConversations(params);
+        }
 
         if (!response || !response.data) {
           dispatch({
@@ -104,7 +165,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         loadingRef.current = false;
       }
     },
-    [t], // Adicionado t para traduções
+    [t, filtersState.activeFilters, filtersState.searchTerm],
   );
 
   const loadMoreConversations = useCallback(async () => {
