@@ -56,11 +56,15 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         return;
       }
 
+      const requestedPage = Number(params?.page || 1);
+      const isFirstPage = requestedPage === 1;
+
       loadingRef.current = true;
-      dispatch({ type: 'SET_CONVERSATIONS_LOADING', payload: true });
+      if (isFirstPage) {
+        dispatch({ type: 'SET_CONVERSATIONS_LOADING', payload: true });
+      }
 
       try {
-        const requestedPage = Number(params?.page || 1);
         const shouldAppend = requestedPage > 1;
 
         const activeFilters = filtersState.activeFilters;
@@ -163,6 +167,9 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       } finally {
         // Reset ref always
         loadingRef.current = false;
+        if (isFirstPage) {
+          dispatch({ type: 'SET_CONVERSATIONS_LOADING', payload: false });
+        }
       }
     },
     [t, filtersState.activeFilters, filtersState.searchTerm],
