@@ -61,6 +61,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useDebounce } from '@/hooks/useDebounce';
 import chatService from '@/services/chat/chatService';
 import api from '@/services/core/api';
+import { useAuthStore } from '@/store/authStore';
 import { pipelinesService } from '@/services/pipelines/pipelinesService';
 import { toast } from 'sonner';
 import type {
@@ -552,9 +553,15 @@ const ChatSidebar = ({
     const fetchCounts = async () => {
       try {
         const assigneeFilter = filters.state.activeFilters.find(f => f.attribute_key === 'assignee_id');
-        const assigneeType = assigneeFilter?.values?.[0] === 'me' ? 'me'
+        let assigneeType = assigneeFilter?.values?.[0] === 'me' ? 'me'
                            : assigneeFilter?.values?.[0] === 'unassigned' ? 'unassigned'
                            : 'all';
+
+        // Se for um agente (agent), ele só deve ver a contagem atribuída a ele.
+        const user = useAuthStore.getState().currentUser;
+        if (user?.role?.key === 'agent') {
+          assigneeType = 'me';
+        }
 
         const extractCount = (countData: any): number => {
           if (typeof countData === 'number') return countData;
