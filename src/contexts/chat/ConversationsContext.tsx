@@ -107,8 +107,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
               page: requestedPage,
             };
             if (!shouldAppend) {
-              const listParams = { ...getParams };
-              delete listParams.page;
+              const { page, ...listParams } = getParams;
               currentQueryRef.current = { kind: 'list', params: listParams };
             }
             response = await chatService.getConversations(getParams);
@@ -131,16 +130,14 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
               page: requestedPage,
             };
             if (!shouldAppend) {
-              const listParams = { ...getParams };
-              delete listParams.page;
+              const { page, ...listParams } = getParams;
               currentQueryRef.current = { kind: 'list', params: listParams };
             }
             response = await chatService.getConversations(getParams);
           }
         } else {
           if (!shouldAppend) {
-            const listParams = { ...(params ?? {}) };
-            delete listParams.page;
+            const { page, ...listParams } = params ?? {};
             currentQueryRef.current = { kind: 'list', params: listParams };
           }
           response = await chatService.getConversations(params);

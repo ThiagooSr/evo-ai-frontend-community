@@ -51,7 +51,6 @@ import { formatConversationTime, formatDetailedTime, normalizeToUnixSeconds } fr
 import { isPhoneBearingChannel } from '@/utils/channelUtils';
 import { formatContactPhone } from '@/utils/contact/formatContactPhone';
 import { findItemInPipeline } from '@/utils/chat/pipelineUtils';
-import { UnreadBadge } from '@/components/shared';
 import { ConversationSkeleton } from '../loading-states';
 import { NoConversations } from '../empty-states';
 import ContactAvatar from '../contact/ContactAvatar';
