@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useUnreadConversationsStore } from '@/store/unreadConversationsStore';
 import { Link, useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import {
@@ -44,8 +45,20 @@ export default function Sidebar({
 
   const companyName = t('sidebar.footer.brand');
 
-  const mainMenuItems = menuItems.filter(item => item.href !== '/tutorials');
-  const tutorialsItem = menuItems.find(item => item.href === '/tutorials');
+  const totalUnread = useUnreadConversationsStore((state) => state.totalUnread);
+
+  const enrichedMenuItems = useMemo(
+    () =>
+      menuItems.map((item) =>
+        item.href === '/conversations' && totalUnread > 0
+          ? { ...item, badge: totalUnread }
+          : item,
+      ),
+    [menuItems, totalUnread],
+  );
+
+  const mainMenuItems = enrichedMenuItems.filter(item => item.href !== '/tutorials');
+  const tutorialsItem = enrichedMenuItems.find(item => item.href === '/tutorials');
 
   // Dismiss collapsed flyout on Escape (WAI-ARIA requirement for popover-like elements)
   useEffect(() => {

@@ -50,7 +50,8 @@
         "conversation_opened": "Conversation Opened",
         "conversation_closed": "Conversation Closed",
         "message_updated": "Message Updated",
-        "message_deleted": "Message Deleted"
+        "message_deleted": "Message Deleted",
+        "channel_message": "New message via {{channel}}"
       }
     }
   },
@@ -109,6 +110,7 @@
       "labels": "Labels",
       "customAttributes": "Custom Attributes",
       "cannedResponses": "Canned Responses",
+      "messageTemplates": "Message Templates",
       "macros": "Macros",
       "templates": "Templates",
       "integrations": "Integrations",

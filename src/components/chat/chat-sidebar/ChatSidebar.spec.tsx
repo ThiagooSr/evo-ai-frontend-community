@@ -59,7 +59,9 @@ vi.mock('@/utils/chat/mediaLabels', () => ({
 }));
 
 vi.mock('../loading-states', () => ({
-  ConversationSkeleton: () => <div data-testid="skeleton" />,
+  ConversationSkeleton: ({ count }: { count?: number }) => (
+    <div data-testid="skeleton" data-count={count} />
+  ),
 }));
 
 vi.mock('../empty-states', () => ({
@@ -345,6 +347,79 @@ describe('ChatSidebar pipeline', () => {
       });
     });
   });
+
+  const makeNestedPipeline = () => {
+    const item = {
+      id: 'item-99',
+      item_id: '42',
+      stage_id: 'stage-1',
+      pipeline_id: 'p1',
+      type: 'conversation',
+      is_lead: false,
+      created_at: '',
+      updated_at: '',
+    };
+    return {
+      id: 'p1',
+      name: 'Pipeline p1',
+      pipeline_type: 'custom' as const,
+      visibility: 'public' as const,
+      is_active: true,
+      stages: [
+        { id: 'stage-1', name: 'Lead', color: '#000', position: 0, created_at: '', updated_at: '', items: [item] },
+        { id: 'stage-2', name: 'Qualified', color: '#000', position: 1, created_at: '', updated_at: '', items: [] },
+      ],
+      items: [],
+      created_at: '',
+      updated_at: '',
+    };
+  };
+
+  it('moves stage via right-click when items are nested under stage.items (real API shape, EVO-1618)', async () => {
+    const pipeline = makeNestedPipeline();
+    vi.mocked(pipelinesService.getPipelines).mockResolvedValue({ data: [pipeline] } as never);
+    vi.mocked(pipelinesService.getPipelinesByConversation).mockResolvedValue([pipeline] as never);
+    vi.mocked(pipelinesService.moveItem).mockResolvedValue({ success: true, message: '' });
+
+    render(<ChatSidebar {...defaultProps} />);
+    await waitFor(() => expect(pipelinesService.getPipelines).toHaveBeenCalled());
+
+    const user = userEvent.setup();
+    await openContextMenuPipelineStage(user, 'Pipeline p1', 'Qualified');
+
+    await waitFor(() => {
+      expect(pipelinesService.moveItem).toHaveBeenCalledWith({
+        pipeline_id: 'p1',
+        item_id: 'item-99',
+        from_stage_id: 'stage-1',
+        to_stage_id: 'stage-2',
+      });
+      expect(pipelinesService.addItemToPipeline).not.toHaveBeenCalled();
+    });
+  });
+
+  it('shows moveError toast (no silent return) when the item cannot be resolved', async () => {
+    const pipeline = {
+      ...makeNestedPipeline(),
+      stages: [
+        { id: 'stage-1', name: 'Lead', color: '#000', position: 0, created_at: '', updated_at: '', items: [] },
+        { id: 'stage-2', name: 'Qualified', color: '#000', position: 1, created_at: '', updated_at: '', items: [] },
+      ],
+    };
+    vi.mocked(pipelinesService.getPipelines).mockResolvedValue({ data: [pipeline] } as never);
+    vi.mocked(pipelinesService.getPipelinesByConversation).mockResolvedValue([pipeline] as never);
+
+    render(<ChatSidebar {...defaultProps} />);
+    await waitFor(() => expect(pipelinesService.getPipelines).toHaveBeenCalled());
+
+    const user = userEvent.setup();
+    await openContextMenuPipelineStage(user, 'Pipeline p1', 'Qualified');
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('pipeline.moveError');
+      expect(pipelinesService.moveItem).not.toHaveBeenCalled();
+    });
+  });
 });
 
 const makePaginatedContext = (hasNextPage: boolean, loadMoreFn = vi.fn().mockResolvedValue(undefined)) => {
@@ -411,7 +486,24 @@ describe('ChatSidebar scroll pagination (EVO-1407)', () => {
     await screen.findByText('Test Contact');
 
     const scrollEl = document.querySelector('[data-tour="chat-conversations-list"]')!;
-    setScrollDimensions(scrollEl, 800, 600, 680);
+    setScrollDimensions(scrollEl, 5000, 600, 4700);
+
+    await act(async () => { fireEvent.scroll(scrollEl); });
+
+    await waitFor(() => expect(loadMore).toHaveBeenCalledTimes(1));
+  });
+
+  it('prefetches well before reaching the bottom (CA-1b anticipated threshold)', async () => {
+    const loadMore = vi.fn().mockResolvedValue(undefined);
+    overrideContext = makePaginatedContext(true, loadMore);
+    render(<ChatSidebar {...defaultProps} />);
+    await screen.findByText('Test Contact');
+
+    const scrollEl = document.querySelector('[data-tour="chat-conversations-list"]')!;
+    // EVO-1672: clientHeight 600 → threshold = max(1000, 1500) = 1500px.
+    // distanceToBottom = 1400px — beyond the previous 900px threshold, yet
+    // still triggers, pinning the widened lookahead.
+    setScrollDimensions(scrollEl, 5000, 600, 3000);
 
     await act(async () => { fireEvent.scroll(scrollEl); });
 
@@ -425,11 +517,39 @@ describe('ChatSidebar scroll pagination (EVO-1407)', () => {
     await screen.findByText('Test Contact');
 
     const scrollEl = document.querySelector('[data-tour="chat-conversations-list"]')!;
-    setScrollDimensions(scrollEl, 800, 600, 0);
+    // distanceToBottom = 5000 - 0 - 600 = 4400px, well past the 1500px threshold.
+    setScrollDimensions(scrollEl, 5000, 600, 0);
 
     await act(async () => { fireEvent.scroll(scrollEl); });
 
     expect(loadMore).not.toHaveBeenCalled();
+  });
+
+  it('keeps the loaded list visible when conversationsLoading flips with items on screen (EVO-1672)', async () => {
+    // loadMore flips the shared conversationsLoading flag; the full-list
+    // skeleton (count=8) must NOT replace an already-populated list — that
+    // loses the scroll position and reads as the whole list vanishing.
+    overrideContext = makePaginatedContext(true);
+    overrideContext.conversations.state.conversationsLoading = true as never;
+    render(<ChatSidebar {...defaultProps} />);
+
+    expect(await screen.findByText('Test Contact')).toBeInTheDocument();
+    expect(screen.queryByTestId('skeleton')).not.toBeInTheDocument();
+  });
+
+  it('renders a multi-row loading cushion during load-more (EVO-1672)', async () => {
+    let resolveFn!: () => void;
+    const loadMore = vi.fn().mockReturnValue(new Promise<void>(res => { resolveFn = res; }));
+    overrideContext = makePaginatedContext(true, loadMore);
+    render(<ChatSidebar {...defaultProps} />);
+    const btn = await screen.findByText('Carregar mais');
+
+    act(() => { fireEvent.click(btn); });
+
+    await waitFor(() => expect(screen.getByTestId('skeleton')).toBeInTheDocument());
+    expect(screen.getByTestId('skeleton').dataset.count).toBe('5');
+
+    await act(async () => { resolveFn(); });
   });
 
   it('does not load more after last page (CA-3)', async () => {

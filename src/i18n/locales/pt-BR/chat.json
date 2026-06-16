@@ -301,7 +301,9 @@
     "status": "Status:",
     "openConversation": "Abrir Conversa",
     "closeConversation": "Fechar conversa",
-    "phoneNumber": "Número de telefone"
+    "phoneNumber": "Número de telefone",
+    "openContactPanel": "Abrir detalhes do contato",
+    "closeContactPanel": "Fechar detalhes do contato"
   },
   "chatSidebar": {
     "searchPlaceholder": "Buscar conversas...",
@@ -410,7 +412,9 @@
         "lastActivity": "Última atividade"
       },
       "notInformed": "Não informado",
-      "copiedToClipboard": "Copiado para a área de transferência"
+      "copiedToClipboard": "Copiado para a área de transferência",
+      "maskedValueCopied": "Valor mascarado copiado — peça acesso ao admin se precisar do dado completo",
+      "dataProtectedTooltip": "Dados protegidos pela política da conta"
     },
     "customAttributes": {
       "noAttributes": "Nenhum atributo personalizado configurado",
@@ -967,5 +971,11 @@
     "addError": "Erro ao adicionar ao pipeline",
     "moveError": "Erro ao mover para o estágio",
     "removeError": "Erro ao remover do pipeline"
+  },
+  "unreadBadge": {
+    "ariaLabel_one": "{{count}} mensagem não lida",
+    "ariaLabel_other": "{{count}} mensagens não lidas",
+    "menuAriaLabel_one": "{{count}} conversa não lida",
+    "menuAriaLabel_other": "{{count}} conversas não lidas"
   }
 }

@@ -304,6 +304,7 @@ export interface CreateConversationRequest {
     content: string;
     private?: boolean;
     template_params?: {
+      id?: string;
       name: string;
       category: string;
       language: string;
@@ -335,6 +336,7 @@ export interface SendMessageRequest {
   attachments?: File[];
   message_type: MessageTypeValue;
   template_params?: {
+    id?: string;
     name: string;
     category: string;
     language: string;
@@ -379,6 +381,13 @@ export interface MessageListParams {
   before?: string;
   after?: string;
 }
+
+// Describes the query that produced the current conversation list, so pagination
+// (load-more) can replay the SAME request for the next page instead of falling
+// back to an unfiltered GET.
+export type ConversationsQuery =
+  | { kind: 'list'; params: ConversationListParams }
+  | { kind: 'filter'; request: FilterRequest };
 
 // Aliases para compatibilidade com código legado
 export type ConversationParams = ConversationListParams;

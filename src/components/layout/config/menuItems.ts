@@ -13,6 +13,7 @@ import {
   Clock,
   Code,
   MessageCircle,
+  LayoutTemplate,
   Key,
   Tags,
   TestTube,
@@ -22,9 +23,9 @@ import {
   List,
   Shield,
   Package,
-  // Filter,
-  // Megaphone,
-  // Route,
+  Filter,
+  Megaphone,
+  Route,
   ShieldCheck,
 } from 'lucide-react';
 
@@ -39,6 +40,7 @@ export interface MenuItem {
   permissions?: string[];
   requireAll?: boolean;
   requiredRoleKey?: string;
+  badge?: number;
 }
 
 export interface SubMenuItem {
@@ -119,20 +121,20 @@ export const getCustomerMenuItems = (t: (key: string) => string): MenuItem[] => 
     resource: 'automation_rules',
     action: 'read',
   },
-  // {
-  //   name: t('menu.customer.journeys'),
-  //   href: '/journeys',
-  //   icon: Route,
-  //   resource: 'journeys',
-  //   action: 'read',
-  // },
-  // {
-  //   name: t('menu.customer.campaigns'),
-  //   href: '/campaigns',
-  //   icon: Megaphone,
-  //   resource: 'campaigns',
-  //   action: 'read',
-  // },
+  {
+    name: t('menu.customer.journeys'),
+    href: '/journeys',
+    icon: Route,
+    resource: 'journeys',
+    action: 'read',
+  },
+  {
+    name: t('menu.customer.campaigns'),
+    href: '/campaigns',
+    icon: Megaphone,
+    resource: 'campaigns',
+    action: 'read',
+  },
   {
     id: 'customer-agents',
     name: t('menu.customer.agents'),
@@ -211,18 +213,25 @@ export const getCustomerMenuItems = (t: (key: string) => string): MenuItem[] => 
         resource: 'custom_attribute_definitions',
         action: 'read',
       },
-      // {
-      //   name: t('menu.settings.segments'),
-      //   href: '/settings/segments',
-      //   icon: Filter,
-      //   resource: 'segments',
-      //   action: 'read',
-      // },
+      {
+        name: t('menu.settings.segments'),
+        href: '/settings/segments',
+        icon: Filter,
+        resource: 'segments',
+        action: 'read',
+      },
       {
         name: t('menu.settings.cannedResponses'),
         href: '/settings/canned-responses',
         icon: MessageCircle,
         resource: 'canned_responses',
+        action: 'read',
+      },
+      {
+        name: t('menu.settings.messageTemplates'),
+        href: '/settings/message-templates',
+        icon: LayoutTemplate,
+        resource: 'message_templates',
         action: 'read',
       },
       {

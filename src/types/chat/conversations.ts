@@ -1,4 +1,4 @@
-import { Conversation, ConversationListParams, Contact } from './api';
+import { Conversation, ConversationListParams, Contact, ConversationsQuery } from './api';
 import { PaginationMeta } from '@/types/core';
 
 export interface ConversationsState {
@@ -55,7 +55,11 @@ export interface ConversationsContextValue {
   // Conversation actions
   loadConversations: (params?: ConversationListParams) => Promise<void>;
   loadMoreConversations: () => Promise<void>;
-  setConversations: (conversations: Conversation[], pagination: PaginationMeta) => void;
+  setConversations: (
+    conversations: Conversation[],
+    pagination: PaginationMeta,
+    query?: ConversationsQuery,
+  ) => void;
   loadSpecificConversation: (conversationId: string) => Promise<Conversation | null>;
   selectConversation: (conversationId: string | null) => void;
   updateConversationStatus: (
@@ -104,7 +108,7 @@ export interface ConversationsContextValue {
 
   // Context menu actions
   deleteConversation: (conversationId: string) => Promise<void>;
-  markAsRead: (conversationId: string) => Promise<void>;
+  markAsRead: (conversationId: string, options?: { silent?: boolean }) => Promise<void>;
   markAsUnread: (conversationId: string) => Promise<void>;
   markAsResolved: (conversationId: string) => Promise<void>;
   markAsPending: (conversationId: string) => Promise<void>;

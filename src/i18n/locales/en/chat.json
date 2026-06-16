@@ -301,7 +301,9 @@
     "status": "Status:",
     "openConversation": "Open Conversation",
     "closeConversation": "Close conversation",
-    "phoneNumber": "Phone number"
+    "phoneNumber": "Phone number",
+    "openContactPanel": "Open contact details",
+    "closeContactPanel": "Close contact details"
   },
   "chatSidebar": {
     "searchPlaceholder": "Search conversations...",
@@ -410,7 +412,9 @@
         "lastActivity": "Last activity"
       },
       "notInformed": "Not informed",
-      "copiedToClipboard": "Copied to clipboard"
+      "copiedToClipboard": "Copied to clipboard",
+      "maskedValueCopied": "Masked value copied — ask an admin for full access if needed",
+      "dataProtectedTooltip": "Data protected by account policy"
     },
     "customAttributes": {
       "noAttributes": "No custom attributes configured",
@@ -963,5 +967,11 @@
     "addError": "Error adding to pipeline",
     "moveError": "Error moving to stage",
     "removeError": "Error removing from pipeline"
+  },
+  "unreadBadge": {
+    "ariaLabel_one": "{{count}} unread message",
+    "ariaLabel_other": "{{count}} unread messages",
+    "menuAriaLabel_one": "{{count}} unread conversation",
+    "menuAriaLabel_other": "{{count}} unread conversations"
   }
 }

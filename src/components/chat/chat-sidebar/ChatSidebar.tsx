@@ -50,6 +50,8 @@ import {
 import { formatConversationTime, formatDetailedTime, normalizeToUnixSeconds } from '@/utils/time/timeHelpers';
 import { isPhoneBearingChannel } from '@/utils/channelUtils';
 import { formatContactPhone } from '@/utils/contact/formatContactPhone';
+import { findItemInPipeline } from '@/utils/chat/pipelineUtils';
+import { UnreadBadge } from '@/components/shared';
 import { ConversationSkeleton } from '../loading-states';
 import { NoConversations } from '../empty-states';
 import ContactAvatar from '../contact/ContactAvatar';
@@ -103,6 +105,13 @@ interface ChatSidebarProps {
   isBulkResolving?: boolean;
   canBulkResolve?: boolean;
 }
+
+// Prefetch the next page well before the user reaches the end so the loading
+// state is not perceived while scrolling. Anticipated by ~2.5 viewport heights
+// (EVO-1672: 1.5 was outrun by fast scrolling / slow connections), with a
+// floor for short viewports. loadMore stays sequential via loadingMoreRef.
+const PREFETCH_VIEWPORT_FACTOR = 2.5;
+const MIN_PREFETCH_DISTANCE_PX = 1000;
 
 const ChatSidebar = ({
   mobileView,
@@ -249,11 +258,12 @@ const ChatSidebar = ({
       const existingInOtherPipelines = currentPipelines.filter(p => p.id !== pipeline.id);
 
       if (existingInSamePipeline) {
-        const item = existingInSamePipeline.items?.find(
-          i => String(i.item_id) === convId,
-        );
+        const item = findItemInPipeline(existingInSamePipeline, convId);
         const itemId = item?.id;
-        if (!itemId) return;
+        if (!itemId) {
+          toast.error(t('pipeline.moveError'));
+          return;
+        }
         try {
           await pipelinesService.moveItem({
             pipeline_id: pipeline.id,
@@ -278,7 +288,7 @@ const ChatSidebar = ({
         if (existingInOtherPipelines.length > 0) {
           const removeResults = await Promise.allSettled(
             existingInOtherPipelines.map(p => {
-              const item = p.items?.find(i => String(i.item_id) === convId);
+              const item = findItemInPipeline(p, convId);
               return item?.id
                 ? pipelinesService.removeItemFromPipeline(p.id, item.id)
                 : Promise.resolve();
@@ -317,9 +327,12 @@ const ChatSidebar = ({
   const handleRemoveFromPipeline = useCallback(
     async (conversation: Conversation, pipeline: Pipeline) => {
       const convId = String(conversation.id);
-      const item = pipeline.items?.find(i => String(i.item_id) === convId);
+      const item = findItemInPipeline(pipeline, convId);
       const itemId = item?.id;
-      if (!itemId) return;
+      if (!itemId) {
+        toast.error(t('pipeline.removeError'));
+        return;
+      }
       try {
         await pipelinesService.removeItemFromPipeline(pipeline.id, itemId);
         toast.success(t('pipeline.removeSuccess'));
@@ -390,9 +403,9 @@ const ChatSidebar = ({
                   <>
                     {(pipeline.stages ?? []).map(stage => {
                       const convInThisPipeline = currentPipelines.find(p => p.id === pipeline.id);
-                      const currentItem = convInThisPipeline?.items?.find(
-                        i => String(i.item_id) === convId,
-                      );
+                      const currentItem = convInThisPipeline
+                        ? findItemInPipeline(convInThisPipeline, convId)
+                        : undefined;
                       const isCurrentStage = currentItem?.stage_id === stage.id;
 
                       return (
@@ -614,34 +627,32 @@ const ChatSidebar = ({
     if (!hasNextPage) return;
 
     const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    if (distanceToBottom > 120) return;
+    const prefetchThreshold = Math.max(
+      MIN_PREFETCH_DISTANCE_PX,
+      container.clientHeight * PREFETCH_VIEWPORT_FACTOR,
+    );
+    if (distanceToBottom > prefetchThreshold) return;
 
     // Update throttle timestamp only after confirming we are near the bottom
     lastScrollTimeRef.current = now;
     loadingMoreRef.current = true;
     setIsLoadingMoreConversations(true);
 
-    const scrollTop = container.scrollTop;
-
     try {
       await conversations.loadMoreConversations();
     } finally {
+      // EVO-1672: no forced scrollTop restore here. It compensated for the
+      // full-list remount (now gone — the list stays mounted during loadMore)
+      // and, with the wider prefetch, it yanked the user back to wherever the
+      // trigger fired if they kept scrolling during the request. Appending
+      // below the viewport does not move scrollTop natively.
       setIsLoadingMoreConversations(false);
-      // Release lock inside RAF so the scroll restoration fires before new events can re-enter
-      requestAnimationFrame(() => {
-        if (sidebarScrollRef.current) {
-          sidebarScrollRef.current.scrollTop = scrollTop;
-        }
-        loadingMoreRef.current = false;
-      });
+      loadingMoreRef.current = false;
     }
   }, [conversations]);
 
   const handleLoadMoreClick = useCallback(async () => {
     if (loadingMoreRef.current || isLoadingMoreConversations || !hasNextPage) return;
-
-    const container = sidebarScrollRef.current;
-    const savedScrollTop = container?.scrollTop ?? 0;
 
     loadingMoreRef.current = true;
     setIsLoadingMoreConversations(true);
@@ -649,12 +660,7 @@ const ChatSidebar = ({
       await conversations.loadMoreConversations();
     } finally {
       setIsLoadingMoreConversations(false);
-      requestAnimationFrame(() => {
-        if (sidebarScrollRef.current) {
-          sidebarScrollRef.current.scrollTop = savedScrollTop;
-        }
-        loadingMoreRef.current = false;
-      });
+      loadingMoreRef.current = false;
     }
   }, [conversations, hasNextPage, isLoadingMoreConversations]);
 
@@ -1046,8 +1052,8 @@ const ChatSidebar = ({
         {/* Filter Actions */}
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            {(conversations.state.conversationsPagination?.total ?? visibleConversations.length)}{' '}
-            {(conversations.state.conversationsPagination?.total ?? visibleConversations.length) === 1
+            {(conversations.state.conversationsPagination?.total || visibleConversations.length)}{' '}
+            {(conversations.state.conversationsPagination?.total || visibleConversations.length) === 1
               ? t('chatSidebar.conversation')
               : t('chatSidebar.conversations')}
           </span>
@@ -1118,7 +1124,12 @@ const ChatSidebar = ({
       >
         {!conversations ? (
           <ConversationSkeleton count={8} />
-        ) : conversations.state.conversationsLoading || filters.state.isApplyingFilters ? (
+        ) : (conversations.state.conversationsLoading && visibleConversations.length === 0) ||
+          filters.state.isApplyingFilters ? (
+          // EVO-1672: the full-list skeleton is for the EMPTY/initial load only.
+          // loadMore flips the shared conversationsLoading flag too, and swapping
+          // the whole list mid-scroll loses the user's position (flicker + jump);
+          // with items on screen the bottom cushion is the loading feedback.
           <ConversationSkeleton count={8} />
         ) : conversations.state.conversationsError ? (
           <div className="p-4 text-center">
@@ -1206,35 +1217,23 @@ const ChatSidebar = ({
                         channelProvider={channelProvider}
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <p className="font-medium truncate">
-                              {conversation.contact?.name || t('chatSidebar.contactNoName')}
-                            </p>
-                            {Boolean(conversation.custom_attributes?.pinned) && (
-                              <Pin className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                            )}
-                            {/* ðŸ"Œ Indicador de Post do Facebook */}
-                            {conversation.additional_attributes?.conversation_type === 'post' && (
-                              <Badge
-                                variant="outline"
-                                className="h-4 px-1.5 text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-700 flex-shrink-0"
-                                title="Facebook Post"
-                              >
-                                <FileText className="h-2.5 w-2.5 mr-0.5" />
-                                Post
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                            {/* Timestamp */}
-                            <span
-                              className="text-xs text-muted-foreground"
-                              title={formatDetailedTime(conversation.timestamp)}
+                        <div className="flex items-center gap-2 min-w-0 mb-1">
+                          <p className="font-medium truncate">
+                            {conversation.contact?.name || t('chatSidebar.contactNoName')}
+                          </p>
+                          {Boolean(conversation.custom_attributes?.pinned) && (
+                            <Pin className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                          )}
+                          {conversation.additional_attributes?.conversation_type === 'post' && (
+                            <Badge
+                              variant="outline"
+                              className="h-4 px-1.5 text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-700 flex-shrink-0"
+                              title="Facebook Post"
                             >
-                              {formatConversationTime(conversation.timestamp)}
-                            </span>
-                          </div>
+                              <FileText className="h-2.5 w-2.5 mr-0.5" />
+                              Post
+                            </Badge>
+                          )}
                         </div>
 
                         {phoneDisplay && (
@@ -1270,7 +1269,13 @@ const ChatSidebar = ({
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-2">
+                      <span
+                        className="text-xs text-muted-foreground leading-none"
+                        title={formatDetailedTime(conversation.timestamp)}
+                      >
+                        {formatConversationTime(conversation.timestamp)}
+                      </span>
                       {(() => {
                         const unreadCount = conversations.getUnreadCount(conversation.id) || 0;
                         return unreadCount > 0 ? (
@@ -1288,9 +1293,12 @@ const ChatSidebar = ({
               );
             })}
 
+            {/* EVO-1672: proportional cushion (~half a viewport) so fast
+                scroll / slow networks read as a deliberate "loading more"
+                affordance instead of a blank gap with pop-in. */}
             {isLoadingMoreConversations && (
               <div className="border-t border-border/40">
-                <ConversationSkeleton count={1} />
+                <ConversationSkeleton count={5} />
               </div>
             )}
 

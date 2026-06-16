@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { journeyService } from '@/services';
 import type { Journey } from '@/types/automation';
 import { useLanguage } from '@/hooks/useLanguage';
+import { validateJourneyTerminalPaths } from '@/utils/journeyFlowValidation';
 import { BaseFlowEditor, type NodeType, type NodeCategory } from '@/components/base';
 import { EnvironmentManager } from '@/components/journey/environment-manager';
 import { JourneyEditorHeader } from '@/components/journey/shared/JourneyEditorHeader';
@@ -31,6 +32,7 @@ import {
 import { loadSnapshot } from '@/store/flowEditor/idbSnapshot';
 import { loadLastSavedAt } from '@/store/flowEditor/lastSavedMark';
 import { FlowFeedbackBanner } from '@/components/journey/_ui';
+import { flowTokens } from '@/components/journey/_ui/tokens';
 
 // Importar todos os nodes da jornada por categoria
 import { JourneyTriggerNode } from '@/components/journey/nodes/trigger/JourneyTriggerNode';
@@ -50,6 +52,11 @@ import {
   SetVariableNode,
   AssignAgentNode,
   AssignTeamNode,
+  AssignBotNode,
+  AssignToPipelineNode,
+  MoveToPipelineStageNode,
+  CreatePipelineTaskNode,
+  SendCannedResponseNode,
   SendEmailTeamNode,
   SendTranscriptNode,
   MuteConversationNode,
@@ -75,6 +82,11 @@ import {
   SetVariablePanel,
   AssignAgentPanel,
   AssignTeamPanel,
+  AssignBotPanel,
+  AssignToPipelinePanel,
+  MoveToPipelineStagePanel,
+  CreatePipelineTaskPanel,
+  SendCannedResponsePanel,
   SendEmailTeamPanel,
   SendTranscriptPanel,
   MuteConversationPanel,
@@ -97,6 +109,7 @@ import {
   MoveRight,
   ArrowRight,
   MessageSquare,
+  MessageSquareReply,
   Variable,
   Users,
   Mail,
@@ -105,6 +118,9 @@ import {
   CheckCircle,
   AlertTriangle,
   Clock,
+  Bot,
+  Workflow,
+  ClipboardList,
 } from 'lucide-react';
 
 /**
@@ -141,6 +157,16 @@ function JourneyFlowEditor() {
   const recoveryCandidate = useFlowEditorStore((s) => s.recoveryCandidate);
   const recoveryEpoch = useFlowEditorStore((s) => s.recoveryEpoch);
   const currentSnapshot = useFlowEditorStore((s) => s.currentSnapshot);
+  const danglingNodes = useMemo(
+    () =>
+      currentSnapshot
+        ? validateJourneyTerminalPaths(
+            currentSnapshot.nodes,
+            currentSnapshot.edges,
+          ).danglingNodes
+        : [],
+    [currentSnapshot],
+  );
 
   const isSaving = status === 'saving';
   const hasUnsavedChanges = status !== 'idle';
@@ -166,6 +192,11 @@ function JourneyFlowEditor() {
       'set-variable-node': SetVariableNode,
       'assign-agent-node': AssignAgentNode,
       'assign-team-node': AssignTeamNode,
+      'assign-bot-node': AssignBotNode,
+      'assign-to-pipeline-node': AssignToPipelineNode,
+      'move-to-pipeline-stage-node': MoveToPipelineStageNode,
+      'create-pipeline-task-node': CreatePipelineTaskNode,
+      'send-canned-response-node': SendCannedResponseNode,
       'send-email-team-node': SendEmailTeamNode,
       'send-transcript-node': SendTranscriptNode,
       'mute-conversation-node': MuteConversationNode,
@@ -199,22 +230,16 @@ function JourneyFlowEditor() {
   // Definir categorias para o NodePanel
   const nodePanelCategories: NodeCategory[] = [
     {
-      value: 'actions',
-      label: t('flowEditor.categories.actions.label'),
+      value: 'controlFlow',
+      label: t('flowEditor.categories.controlFlow.label'),
       icon: MoveRight,
-      description: t('flowEditor.categories.actions.description'),
+      description: t('flowEditor.categories.controlFlow.description'),
     },
     {
       value: 'communication',
       label: t('flowEditor.categories.communication.label'),
       icon: Send,
       description: t('flowEditor.categories.communication.description'),
-    },
-    {
-      value: 'labels',
-      label: t('flowEditor.categories.labels.label'),
-      icon: Tag,
-      description: t('flowEditor.categories.labels.description'),
     },
     {
       value: 'contact',
@@ -224,7 +249,7 @@ function JourneyFlowEditor() {
     },
     {
       value: 'conversation',
-      label: t('flowEditor.categories.conversation.labels'),
+      label: t('flowEditor.categories.conversation.label'),
       icon: MessageSquare,
       description: t('flowEditor.categories.conversation.description'),
     },
@@ -232,62 +257,69 @@ function JourneyFlowEditor() {
 
   // Definir tipos de nodes para o NodePanel
   const nodePanelNodeTypes: Record<string, NodeType[]> = {
-    actions: [
+    controlFlow: [
       {
         id: 'wait-node',
         name: t('flowEditor.nodes.wait.name'),
         icon: ClockIcon,
         color: 'text-blue-400',
-        category: 'actions',
+        category: 'controlFlow',
         description: t('flowEditor.nodes.wait.description'),
+        searchKeywords: ['delay', 'pause', 'sleep', 'timer', 'hold'],
       },
       {
         id: 'scheduled-action-node',
         name: t('flowEditor.nodes.scheduledAction.name'),
         icon: Clock,
         color: 'text-orange-400',
-        category: 'actions',
+        category: 'controlFlow',
         description: t('flowEditor.nodes.scheduledAction.description'),
+        searchKeywords: ['schedule', 'defer', 'queue', 'later', 'cron', 'timer'],
       },
       {
         id: 'conditional-node',
         name: t('flowEditor.nodes.conditional.name'),
         icon: GitBranch,
         color: 'text-yellow-400',
-        category: 'actions',
+        category: 'controlFlow',
         description: t('flowEditor.nodes.conditional.description'),
+        searchKeywords: ['branch', 'if', 'condition', 'route', 'switch', 'decision'],
       },
       {
         id: 'split-node',
         name: t('flowEditor.nodes.split.name'),
         icon: Split,
         color: 'text-indigo-400',
-        category: 'actions',
+        category: 'controlFlow',
         description: t('flowEditor.nodes.split.description'),
+        searchKeywords: ['ab', 'a/b', 'test', 'distribute', 'random', 'variant', 'experiment'],
       },
       {
         id: 'exit-journey-node',
         name: t('flowEditor.nodes.exitJourney.name'),
         icon: LogOut,
         color: 'text-red-400',
-        category: 'actions',
+        category: 'controlFlow',
         description: t('flowEditor.nodes.exitJourney.description'),
+        searchKeywords: ['exit', 'leave', 'terminate', 'end', 'stop', 'finish'],
       },
       {
         id: 'transfer-journey-node',
         name: t('flowEditor.nodes.transferJourney.name'),
         icon: ArrowRight,
         color: 'text-orange-400',
-        category: 'actions',
+        category: 'controlFlow',
         description: t('flowEditor.nodes.transferJourney.description'),
+        searchKeywords: ['transfer', 'move', 'redirect', 'switch', 'jump', 'journey'],
       },
       {
         id: 'set-variable-node',
         name: t('flowEditor.nodes.setVariable.name'),
         icon: Variable,
         color: 'text-purple-400',
-        category: 'actions',
+        category: 'controlFlow',
         description: t('flowEditor.nodes.setVariable.description'),
+        searchKeywords: ['variable', 'store', 'save', 'assign', 'set', 'value'],
       },
     ],
     communication: [
@@ -298,6 +330,16 @@ function JourneyFlowEditor() {
         color: 'text-blue-400',
         category: 'communication',
         description: t('flowEditor.nodes.sendMessage.description'),
+        searchKeywords: ['chat', 'text', 'reply', 'whatsapp', 'sms', 'communicate', 'send'],
+      },
+      {
+        id: 'send-canned-response-node',
+        name: t('flowEditor.nodes.sendCannedResponse.name'),
+        icon: MessageSquareReply,
+        color: 'text-blue-400',
+        category: 'communication',
+        description: t('flowEditor.nodes.sendCannedResponse.description'),
+        searchKeywords: ['canned', 'quick', 'reply', 'preset', 'template', 'response', 'faq'],
       },
       {
         id: 'send-webhook-node',
@@ -306,6 +348,7 @@ function JourneyFlowEditor() {
         color: 'text-purple-400',
         category: 'communication',
         description: t('flowEditor.nodes.sendWebhook.description'),
+        searchKeywords: ['http', 'api', 'request', 'post', 'integration', 'callback', 'rest'],
       },
       {
         id: 'send-email-team-node',
@@ -314,6 +357,7 @@ function JourneyFlowEditor() {
         color: 'text-emerald-400',
         category: 'communication',
         description: t('flowEditor.nodes.sendEmailTeam.description'),
+        searchKeywords: ['email', 'mail', 'team', 'notify', 'internal'],
       },
       {
         id: 'send-transcript-node',
@@ -322,24 +366,7 @@ function JourneyFlowEditor() {
         color: 'text-teal-400',
         category: 'communication',
         description: t('flowEditor.nodes.sendTranscript.description'),
-      },
-    ],
-    labels: [
-      {
-        id: 'add-label-node',
-        name: t('flowEditor.nodes.addLabel.name'),
-        icon: Tag,
-        color: 'text-green-400',
-        category: 'labels',
-        description: t('flowEditor.nodes.addLabel.description'),
-      },
-      {
-        id: 'remove-label-node',
-        name: t('flowEditor.nodes.removeLabel.name'),
-        icon: Trash2,
-        color: 'text-red-400',
-        category: 'labels',
-        description: t('flowEditor.nodes.removeLabel.description'),
+        searchKeywords: ['transcript', 'export', 'history', 'log', 'summary'],
       },
     ],
     contact: [
@@ -350,6 +377,7 @@ function JourneyFlowEditor() {
         color: 'text-cyan-400',
         category: 'contact',
         description: t('flowEditor.nodes.updateContact.description'),
+        searchKeywords: ['edit', 'modify', 'change', 'profile', 'data'],
       },
       {
         id: 'update-custom-attribute-node',
@@ -358,6 +386,25 @@ function JourneyFlowEditor() {
         color: 'text-pink-400',
         category: 'contact',
         description: t('flowEditor.nodes.updateCustomAttribute.description'),
+        searchKeywords: ['attribute', 'field', 'custom', 'metadata', 'property'],
+      },
+      {
+        id: 'add-label-node',
+        name: t('flowEditor.nodes.addLabel.name'),
+        icon: Tag,
+        color: 'text-green-400',
+        category: 'contact',
+        description: t('flowEditor.nodes.addLabel.description'),
+        searchKeywords: ['tag', 'classify', 'mark', 'categorize', 'etiqueta'],
+      },
+      {
+        id: 'remove-label-node',
+        name: t('flowEditor.nodes.removeLabel.name'),
+        icon: Trash2,
+        color: 'text-red-400',
+        category: 'contact',
+        description: t('flowEditor.nodes.removeLabel.description'),
+        searchKeywords: ['untag', 'unmark', 'delete', 'label', 'etiqueta'],
       },
       {
         id: 'assign-agent-node',
@@ -366,6 +413,7 @@ function JourneyFlowEditor() {
         color: 'text-violet-400',
         category: 'contact',
         description: t('flowEditor.nodes.assignAgent.description'),
+        searchKeywords: ['user', 'operator', 'handoff', 'agent', 'route'],
       },
       {
         id: 'assign-team-node',
@@ -374,6 +422,43 @@ function JourneyFlowEditor() {
         color: 'text-sky-400',
         category: 'contact',
         description: t('flowEditor.nodes.assignTeam.description'),
+        searchKeywords: ['team', 'group', 'queue', 'handoff', 'route'],
+      },
+      {
+        id: 'assign-bot-node',
+        name: t('flowEditor.nodes.assignBot.name'),
+        icon: Bot,
+        color: 'text-purple-400',
+        category: 'contact',
+        description: t('flowEditor.nodes.assignBot.description'),
+        searchKeywords: ['bot', 'automation', 'ai', 'assistant', 'automate'],
+      },
+      {
+        id: 'assign-to-pipeline-node',
+        name: t('flowEditor.nodes.assignToPipeline.name'),
+        icon: Workflow,
+        color: 'text-amber-400',
+        category: 'contact',
+        description: t('flowEditor.nodes.assignToPipeline.description'),
+        searchKeywords: ['pipeline', 'funnel', 'sales', 'stage', 'crm', 'deal'],
+      },
+      {
+        id: 'move-to-pipeline-stage-node',
+        name: t('flowEditor.nodes.moveToPipelineStage.name'),
+        icon: Workflow,
+        color: 'text-amber-400',
+        category: 'contact',
+        description: t('flowEditor.nodes.moveToPipelineStage.description'),
+        searchKeywords: ['pipeline', 'stage', 'move', 'funnel', 'sales', 'crm'],
+      },
+      {
+        id: 'create-pipeline-task-node',
+        name: t('flowEditor.nodes.createPipelineTask.name'),
+        icon: ClipboardList,
+        color: 'text-amber-400',
+        category: 'contact',
+        description: t('flowEditor.nodes.createPipelineTask.description'),
+        searchKeywords: ['task', 'todo', 'pipeline', 'follow up', 'crm', 'reminder'],
       },
     ],
     conversation: [
@@ -384,6 +469,7 @@ function JourneyFlowEditor() {
         color: 'text-gray-400',
         category: 'conversation',
         description: t('flowEditor.nodes.muteConversation.description'),
+        searchKeywords: ['mute', 'silence', 'quiet', 'hide', 'suppress'],
       },
       {
         id: 'defer-conversation-node',
@@ -392,6 +478,7 @@ function JourneyFlowEditor() {
         color: 'text-yellow-400',
         category: 'conversation',
         description: t('flowEditor.nodes.deferConversation.description'),
+        searchKeywords: ['snooze', 'defer', 'postpone', 'delay', 'later'],
       },
       {
         id: 'resolve-conversation-node',
@@ -400,6 +487,7 @@ function JourneyFlowEditor() {
         color: 'text-green-400',
         category: 'conversation',
         description: t('flowEditor.nodes.resolveConversation.description'),
+        searchKeywords: ['resolve', 'close', 'complete', 'finish', 'done'],
       },
       {
         id: 'change-priority-node',
@@ -408,36 +496,46 @@ function JourneyFlowEditor() {
         color: 'text-indigo-400',
         category: 'conversation',
         description: t('flowEditor.nodes.changePriority.description'),
+        searchKeywords: ['priority', 'urgent', 'importance', 'vip', 'escalate'],
       },
     ],
   };
 
-  // Cores para o MiniMap
+  // Maps each node type to a flow-* design-system token via the
+  // typed `flowTokens` object from `@/components/journey/_ui/tokens`
+  // (EVO-1253 contract for consumers outside Tailwind className). Nodes
+  // without a direct subtype match in the current taxonomy fall back to
+  // action-pipeline (see EVO-1259 audit §G3).
   const miniMapNodeColors = useMemo(
     () => ({
-      'journey-trigger-node': '#10b981', // verde para trigger
-      'wait-node': '#3b82f6', // azul para wait
-      'scheduled-action-node': '#fb923c', // orange para scheduled action
-      'conditional-node': '#eab308', // amarelo para condicional
-      'split-node': '#6366f1', // indigo para split
-      'exit-journey-node': '#ef4444', // vermelho para sair da jornada
-      'send-webhook-node': '#a855f7', // purple para webhook
-      'add-label-node': '#10b981', // verde para adicionar etiqueta
-      'remove-label-node': '#ef4444', // vermelho para remover etiqueta
-      'update-contact-node': '#06b6d4', // cyan para atualizar contato
-      'update-custom-attribute-node': '#ec4899', // pink para atributo personalizado
-      'transfer-journey-node': '#fb923c', // orange para transferir jornada
-      'send-message-node': '#3b82f6', // blue para enviar mensagem
-      'set-variable-node': '#a855f7', // purple para definir variável
-      'assign-agent-node': '#8b5cf6', // violet para atribuir agente
-      'assign-team-node': '#0ea5e9', // sky para atribuir equipe
-      'send-email-team-node': '#10b981', // emerald para enviar email equipe
-      'send-transcript-node': '#14b8a6', // teal para enviar transcrição
-      'mute-conversation-node': '#64748b', // gray para silenciar conversa
-      'defer-conversation-node': '#eab308', // yellow para adiar conversa
-      'resolve-conversation-node': '#10b981', // green para resolver conversa
-      'change-priority-node': '#6366f1', // indigo para alterar prioridade
-      default: '#64748b', // cinza para outros
+      'journey-trigger-node': flowTokens.node.trigger.border,
+      'conditional-node': flowTokens.node.condition.border,
+      'wait-node': flowTokens.node.control.border,
+      'split-node': flowTokens.node.control.border,
+      'scheduled-action-node': flowTokens.node.control.border,
+      'set-variable-node': flowTokens.node.control.border,
+      'exit-journey-node': flowTokens.node.exit.border,
+      'transfer-journey-node': flowTokens.node.exit.border,
+      'send-message-node': flowTokens.node.action.message.border,
+      'send-canned-response-node': flowTokens.node.action.message.border,
+      'send-transcript-node': flowTokens.node.action.message.border,
+      'send-email-team-node': flowTokens.node.action.message.border,
+      'send-webhook-node': flowTokens.node.action.webhook.border,
+      'add-label-node': flowTokens.node.action.label.border,
+      'remove-label-node': flowTokens.node.action.label.border,
+      'update-contact-node': flowTokens.node.action.pipeline.border,
+      'update-custom-attribute-node': flowTokens.node.action.pipeline.border,
+      'assign-agent-node': flowTokens.node.action.pipeline.border,
+      'assign-team-node': flowTokens.node.action.pipeline.border,
+      'assign-bot-node': flowTokens.node.action.pipeline.border,
+      'assign-to-pipeline-node': flowTokens.node.action.pipeline.border,
+      'move-to-pipeline-stage-node': flowTokens.node.action.pipeline.border,
+      'create-pipeline-task-node': flowTokens.node.action.pipeline.border,
+      'change-priority-node': flowTokens.node.action.pipeline.border,
+      'mute-conversation-node': flowTokens.node.action.pipeline.border,
+      'defer-conversation-node': flowTokens.node.action.pipeline.border,
+      'resolve-conversation-node': flowTokens.node.action.pipeline.border,
+      default: 'var(--color-muted-foreground)',
     }),
     [],
   );
@@ -492,6 +590,16 @@ function JourneyFlowEditor() {
           return <AssignAgentPanel {...commonProps} />;
         case 'assign-team-node':
           return <AssignTeamPanel {...commonProps} />;
+        case 'assign-bot-node':
+          return <AssignBotPanel {...commonProps} />;
+        case 'assign-to-pipeline-node':
+          return <AssignToPipelinePanel {...commonProps} />;
+        case 'move-to-pipeline-stage-node':
+          return <MoveToPipelineStagePanel {...commonProps} />;
+        case 'create-pipeline-task-node':
+          return <CreatePipelineTaskPanel {...commonProps} />;
+        case 'send-canned-response-node':
+          return <SendCannedResponsePanel {...commonProps} />;
         case 'send-email-team-node':
           return <SendEmailTeamPanel {...commonProps} />;
         case 'send-transcript-node':
@@ -622,6 +730,12 @@ function JourneyFlowEditor() {
             webhookSecret: triggerNode.data.webhookSecret,
             webhookMethod: triggerNode.data.webhookMethod,
             expectedHeaders: triggerNode.data.expectedHeaders,
+            pipelineId: triggerNode.data.pipelineId,
+            pipelineName: triggerNode.data.pipelineName,
+            fromStageId: triggerNode.data.fromStageId,
+            fromStageName: triggerNode.data.fromStageName,
+            toStageId: triggerNode.data.toStageId,
+            toStageName: triggerNode.data.toStageName,
           },
         }));
 
@@ -640,7 +754,19 @@ function JourneyFlowEditor() {
       // requirement of EVO-1258).
       useFlowEditorStore.getState().commitSave(new Date(), snapshot);
       if (!opts?.silent) {
-        toast.success(t('flowEditor.saveSuccess'));
+        const { danglingNodes } = validateJourneyTerminalPaths(
+          snapshot.nodes,
+          snapshot.edges,
+        );
+        if (danglingNodes.length > 0) {
+          toast.warning(
+            t('flowEditor.validation.danglingExitWarning', {
+              nodes: danglingNodes.map((node) => node.label).join(', '),
+            }),
+          );
+        } else {
+          toast.success(t('flowEditor.saveSuccess'));
+        }
       }
     } catch (error) {
       console.error('Erro ao salvar jornada:', error);
@@ -797,6 +923,16 @@ function JourneyFlowEditor() {
                   seconds: Math.round(nextRetryDelayMs / 1000),
                 })
               : t('flowEditor.saveErrorBannerNoRetry', { reason: lastError })}
+          </p>
+        </FlowFeedbackBanner>
+      ) : null}
+
+      {danglingNodes.length > 0 ? (
+        <FlowFeedbackBanner variant="warn" className="mx-4 mt-2">
+          <p>
+            {t('flowEditor.validation.danglingExitBanner', {
+              nodes: danglingNodes.map((node) => node.label).join(', '),
+            })}
           </p>
         </FlowFeedbackBanner>
       ) : null}

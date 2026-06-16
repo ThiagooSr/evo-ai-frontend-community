@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- N/A
+- **EVO-1551** Visual masking of contact PII (phone, email, WhatsApp identifier) on five render sites (chat sidebar, chat header, contact card, contacts table, contact details). Controlled by new `account.settings.mask_contact_pii` toggle in Account Settings (default OFF). Admin users always see full data; non-admin users see masked values with a `Lock` icon affordance, tooltip, and clipboard receiving the masked string. i18n added in 6 locales. Frontend-only feature — the API still returns full values.
 
 ### Changed
 
@@ -18,6 +18,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - N/A
+
+## [v1.0.0-rc5] - 2026-05-27
+
+Hardening release on the frontend side of CRM Community rc5 — **"fresh-install hardening + EvoFlow expansion"**. Two main themes: **(1) EvoFlow event UI** — new shared `EventSelector` and `EventPropertiesForm` components that consume the event manifest, replacing hard-coded event lists in flow editor nodes; and **(2) notifications polish** — redesigned `NotificationItem` with sender name, avatar, message preview and locale-aware relative timestamps, plus WS update merge guards and reducer-level remove-on-read tests. Also rolls up small accessibility (WCAG AA contrast), i18n, and EvoFlow cleanup fixes, and an Evolution Hub UX improvement to link inboxes to existing Hub channels.
+
+### Added
+
+- **EVO-1261 — Shared `EventSelector` + `EventPropertiesForm` consuming event manifest** (#108) — new shared components that read the canonical event manifest instead of duplicating hard-coded event lists across flow editor nodes. Foundation for EvoFlow event configuration UI.
+- **Evolution Hub — link inbox to existing Hub channel** — connect flow now allows operators to link an inbox to an already-existing Hub channel, instead of only creating a new one each time.
+- **Notifications — redesigned `NotificationItem`** — notification row now shows sender name, avatar, message preview, and relative timestamp, replacing the previous minimal layout.
+
+### Changed
+
+- **Notifications — locale-aware relative time** — `NotificationItem` switched to `date-fns` locale-aware relative time helpers (and dropped unrelated storybook deps that had been pulled in by mistake).
+
+### Fixed
+
+- **Notifications — WS update merge guard + reducer tests** — guarded the WebSocket update merge path so concurrent updates do not produce inconsistent state, and added reducer tests covering the remove-on-read behavior.
+- **Notifications — use `notification.sender` for name and avatar** in `NotificationItem` (the field was being read from the wrong source, causing missing/incorrect avatars).
+- **EVO-1421 — Remove inert floating-panel wrapper and retire `BaseFlowPanel`** — the wrapper was rendered but inert (no click/keyboard interaction reached the panel); removed and the legacy `BaseFlowPanel` was retired now that consumers migrated.
+- **EVO-1454 — `ConditionalNode` empty-state hint contrast bumped to `text-yellow-700` for WCAG AA** — previous shade did not meet AA contrast on the node background.
+- **i18n — Spanish accent in `channel_message` key + double blank line cleanup** — corrected the Spanish translation accent and removed a stray double blank line in the same locale file.
+- **Build — sync `package-lock.json` and exclude `.stories.tsx` from `tsc -b`** — the `@tanstack/react-virtual` dep was added to `package.json` without updating the lock file, breaking `npm ci` in the Docker build; storybook devDependencies were removed but `.stories.tsx` files remained, causing `tsc -b` to fail on missing `@storybook/react-vite`. Lock file was regenerated against Node 20 (the CI/Dockerfile target) and `*.stories.{ts,tsx}` are now excluded from `tsconfig.app.json`. Stories were not part of the production bundle anyway.
+
+### Upgrade notes
+
+- `EventSelector` / `EventPropertiesForm` are drop-in shared components for flow editor nodes — they read the event manifest at runtime, so adding/removing events on the backend side no longer requires touching the frontend node code.
+- The retired `BaseFlowPanel` (EVO-1421) had no remaining consumers at the time of removal; if a downstream fork still imports it, migrate to the per-panel components directly.
 
 ## [v1.0.0-rc4] - 2026-05-25
 
@@ -223,7 +251,8 @@ PR #25 migrated from static PNGs to monochromatic SVGs from `@icons-pack/react-s
 
 ---
 
-[Unreleased]: https://github.com/evolution-foundation/evo-ai-frontend-community/compare/v1.0.0-rc4...HEAD
+[Unreleased]: https://github.com/evolution-foundation/evo-ai-frontend-community/compare/v1.0.0-rc5...HEAD
+[v1.0.0-rc5]: https://github.com/evolution-foundation/evo-ai-frontend-community/compare/v1.0.0-rc4...v1.0.0-rc5
 [v1.0.0-rc4]: https://github.com/evolution-foundation/evo-ai-frontend-community/compare/v1.0.0-rc3...v1.0.0-rc4
 [v1.0.0-rc3]: https://github.com/evolution-foundation/evo-ai-frontend-community/compare/v1.0.0-rc2...v1.0.0-rc3
 [v1.0.0-rc2]: https://github.com/evolution-foundation/evo-ai-frontend-community/compare/v1.0.0-rc1...v1.0.0-rc2

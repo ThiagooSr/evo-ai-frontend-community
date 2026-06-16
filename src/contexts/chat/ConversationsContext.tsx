@@ -16,13 +16,14 @@ import {
 
 import { chatService } from '@/services/chat/chatService';
 import { conversationAPI } from '@/services/conversations/conversationService';
+import { useUnreadConversationsStore } from '@/store/unreadConversationsStore';
 
 import { toast } from 'sonner';
 
 import { extractConversationsData } from '@/utils/chat/responseHelpers';
 import { isActionNotSupported } from '@/utils/chat/actionSupport';
 
-import { Contact, Conversation, ConversationListParams } from '@/types/chat/api';
+import { Contact, Conversation, ConversationListParams, ConversationsQuery } from '@/types/chat/api';
 import { PaginationMeta } from '@/types/core';
 import { DEFAULT_PAGE_SIZE } from '@/constants/pagination';
 import { matchesConversationId } from '@/utils/chat/conversationMatcher';
@@ -37,6 +38,9 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const loadingSpecificRef = useRef<Set<string>>(new Set());
   const selectionLockRef = useRef(false);
   const lastCleanupRef = useRef(0);
+  // The query that produced the current list, so load-more replays the SAME
+  // request for the next page instead of an unfiltered GET /conversations.
+  const currentQueryRef = useRef<ConversationsQuery>({ kind: 'list', params: { status: 'open' } });
 
   const findConversationByAnyId = useCallback(
     (conversationId: string) => {
@@ -66,7 +70,6 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
 
       try {
         const shouldAppend = requestedPage > 1;
-
         const activeFilters = filtersState.activeFilters;
         const searchTerm = filtersState.searchTerm;
 
@@ -90,16 +93,25 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
               q: searchTerm,
               page: requestedPage,
             };
+            if (!shouldAppend) {
+              currentQueryRef.current = { kind: 'filter', request: filterRequest };
+            }
             response = await chatService.filterConversations(filterRequest);
           } else {
             const filterParams = finalFilters.length > 0 ? convertFiltersToUrlParams(finalFilters) : {};
             const searchParams = createSearchFilter(searchTerm);
             const combined = combineSearchWithFilters(searchParams, filterParams);
-            response = await chatService.getConversations({
+            const getParams = {
               ...combined,
               ...params,
               page: requestedPage,
-            });
+            };
+            if (!shouldAppend) {
+              const listParams = { ...getParams };
+              delete listParams.page;
+              currentQueryRef.current = { kind: 'list', params: listParams };
+            }
+            response = await chatService.getConversations(getParams);
           }
         } else if (finalFilters.length > 0) {
           if (shouldUseAdvancedFilters(finalFilters)) {
@@ -107,16 +119,30 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
               ...convertFiltersToApiFormat(finalFilters),
               page: requestedPage,
             };
+            if (!shouldAppend) {
+              currentQueryRef.current = { kind: 'filter', request: filterRequest };
+            }
             response = await chatService.filterConversations(filterRequest);
           } else {
             const filterParams = convertFiltersToUrlParams(finalFilters);
-            response = await chatService.getConversations({
+            const getParams = {
               ...filterParams,
               ...params,
               page: requestedPage,
-            });
+            };
+            if (!shouldAppend) {
+              const listParams = { ...getParams };
+              delete listParams.page;
+              currentQueryRef.current = { kind: 'list', params: listParams };
+            }
+            response = await chatService.getConversations(getParams);
           }
         } else {
+          if (!shouldAppend) {
+            const listParams = { ...(params ?? {}) };
+            delete listParams.page;
+            currentQueryRef.current = { kind: 'list', params: listParams };
+          }
           response = await chatService.getConversations(params);
         }
 
@@ -185,8 +211,31 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       return;
     }
 
-    await loadConversations({ page: currentPage + 1 });
-  }, [state.conversationsPagination, state.conversationsLoading, loadConversations]);
+    const nextPage = currentPage + 1;
+    const query = currentQueryRef.current;
+
+    // Advanced-filter lists came from POST /conversations/filter; replay that
+    // same request for the next page (loadConversations only knows GET).
+    if (query.kind === 'filter') {
+      loadingRef.current = true;
+      dispatch({ type: 'SET_CONVERSATIONS_LOADING', payload: true });
+      try {
+        const response = await chatService.filterConversations({ ...query.request, page: nextPage });
+        const { conversations, pagination: nextPagination } = extractConversationsData(response);
+        dispatch({ type: 'APPEND_CONVERSATIONS', payload: { conversations, pagination: nextPagination } });
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : t('contexts.conversations.errors.loadConversations');
+        dispatch({ type: 'SET_CONVERSATIONS_ERROR', payload: errorMessage });
+        dispatch({ type: 'SET_CONVERSATIONS_LOADING', payload: false });
+      } finally {
+        loadingRef.current = false;
+      }
+      return;
+    }
+
+    await loadConversations({ ...query.params, page: nextPage });
+  }, [state.conversationsPagination, state.conversationsLoading, loadConversations, t]);
 
   const loadSpecificConversation = useCallback(
     async (conversationId: string): Promise<Conversation | null> => {
@@ -255,7 +304,10 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   );
 
   const setConversations = useCallback(
-    (conversations: Conversation[], pagination: PaginationMeta) => {
+    (conversations: Conversation[], pagination: PaginationMeta, query?: ConversationsQuery) => {
+      if (query) {
+        currentQueryRef.current = query;
+      }
       dispatch({ type: 'SET_CONVERSATIONS', payload: { conversations, pagination } });
     },
     [],
@@ -354,6 +406,8 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         } else {
           console.warn('updateConversationStatus: Invalid response', response);
         }
+
+        useUnreadConversationsStore.getState().fetch();
 
         const statusName = t(`contexts.conversations.statusNames.${status}`);
 
@@ -621,12 +675,16 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     }
   }, [state.conversations]);
 
-  const updateUnreadCount = useCallback((conversationId: string, count: number) => {
-    dispatch({
-      type: 'UPDATE_UNREAD_COUNT',
-      payload: { conversationId, count },
-    });
-  }, []);
+  const updateUnreadCount = useCallback(
+    (conversationId: string, count: number) => {
+      dispatch({
+        type: 'UPDATE_UNREAD_COUNT',
+        payload: { conversationId, count },
+      });
+      useUnreadConversationsStore.getState().fetch();
+    },
+    [],
+  );
 
   const updateConversationLastActivity = useCallback(
     (conversationId: string, lastActivityAt: string) => {
@@ -643,6 +701,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       type: 'INCREMENT_UNREAD_COUNT',
       payload: { conversationId },
     });
+    useUnreadConversationsStore.getState().fetch();
   }, []);
 
   const addHiddenConversation = useCallback((conversation: Conversation) => {
@@ -683,17 +742,19 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   );
 
   const markAsRead = useCallback(
-    async (conversationId: string) => {
+    async (conversationId: string, options?: { silent?: boolean }) => {
       try {
         await conversationAPI.markAsRead(conversationId);
 
-        // Update local state - set unread count to 0
         dispatch({
           type: 'UPDATE_UNREAD_COUNT',
           payload: { conversationId, count: 0 },
         });
+        useUnreadConversationsStore.getState().fetch();
 
-        toast.success(t('contexts.conversations.success.markedAsRead'));
+        if (!options?.silent) {
+          toast.success(t('contexts.conversations.success.markedAsRead'));
+        }
       } catch (error) {
         console.error('Error marking conversation as read:', error);
         toast.error(t('contexts.conversations.errors.markAsRead'), {
@@ -713,12 +774,12 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       try {
         await conversationAPI.markAsUnread(conversationId);
 
-        // Update local state - set unread count to 1 (or increment existing)
         const currentCount = state.unreadCounts[conversationId] || 0;
         dispatch({
           type: 'UPDATE_UNREAD_COUNT',
           payload: { conversationId, count: Math.max(1, currentCount) },
         });
+        useUnreadConversationsStore.getState().fetch();
 
         toast.success(t('contexts.conversations.success.markedAsUnread'));
       } catch (error) {
@@ -749,6 +810,8 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         } else {
           console.warn('Invalid updatedConversation', updatedConversation);
         }
+
+        useUnreadConversationsStore.getState().fetch();
 
         toast.success(t('contexts.conversations.success.markedAsResolved'));
       } catch (error) {
