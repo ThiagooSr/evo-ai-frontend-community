@@ -153,6 +153,14 @@ vi.mock('@/services/permissions', () => ({
               read: { name: 'View', description: '', basic: false, implied_by: null },
             },
           },
+          ai_tools: {
+            name: 'AI Custom Tools',
+            description: '',
+            actions: {
+              read: { name: 'View', description: '', basic: false, implied_by: null },
+              available: { name: 'Available', description: '', basic: false, implied_by: null },
+            },
+          },
         },
       },
     }),
@@ -288,7 +296,7 @@ describe('RoleDetail — domain grouping, system filter, search, nesting', () =>
     render(<RoleDetail />);
     await waitFor(() => expect(cb('conversations.read')).not.toBeNull());
 
-    ['oauth_applications', 'whatsapp_authorizations', 'ai_folders'].forEach(resource => {
+    ['oauth_applications', 'whatsapp_authorizations', 'ai_folders', 'ai_tools'].forEach(resource => {
       expect(cb(`${resource}.read`)).toBeNull();
       expect(cb(`resource-${resource}`)).toBeNull();
     });

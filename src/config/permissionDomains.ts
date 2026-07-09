@@ -34,9 +34,10 @@ export const PERMISSION_DOMAINS: PermissionDomain[] = [
   {
     key: 'ai',
     labelKey: 'domains.ai',
-    // ai_tools/ai_folders/ai_mcp_servers were KEPT by the Story 1.1 audit (they
-    // have live enforcement in the core-service and processor), so they must be
-    // grouped here — otherwise they would fall into "Others".
+    // ai_tools/ai_folders/ai_mcp_servers stay listed here but do not render today:
+    // HIDDEN_RESOURCES keeps them off the editor (see the note there). They remain
+    // in the catalog — the core-service and processor still enforce them — so the
+    // grouping is kept for when the follow-up settles their fate.
     resources: [
       'ai_agents',
       'ai_tools',
@@ -93,6 +94,15 @@ export const INBOX_TEMPLATE_ACTIONS: string[] = [
 //                       /agents/mcp-servers has never been in the menu.
 //   ai_clients          upstream multi-tenant leftover. Its one live key gates a
 //                       session counter against hard-coded limits, with no caller.
+//   ai_tools            the BUILT-IN tool catalog, read-only (despite its catalog
+//                       label saying "AI Custom Tools" — the user-created ones are
+//                       ai_custom_tools). Of its 8 keys only `available` and
+//                       `categories` gate anything, and both serve the agent
+//                       editor's ToolsDialog: whoever manages AI agents must be
+//                       able to list the built-in tools. That is an implication of
+//                       ai_agents, not a checkbox of its own. Hiding revokes
+//                       nothing — held grants are still persisted — it only stops
+//                       offering a toggle nobody could use correctly.
 //   *_authorizations    these name the OAuth handshake, not the thing it creates:
 //                       connecting a channel creates an inbox, and /channels/new
 //                       already requires inboxes.create. 15 of their 20 keys gate
@@ -106,6 +116,7 @@ export const HIDDEN_RESOURCES = new Set<string>([
   'ai_folders',
   'ai_mcp_servers',
   'ai_clients',
+  'ai_tools',
   'google_authorizations',
   'instagram_authorizations',
   'microsoft_authorizations',
