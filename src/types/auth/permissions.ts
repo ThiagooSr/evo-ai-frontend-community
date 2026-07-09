@@ -25,6 +25,10 @@ export interface ResourceActionConfig {
   // the checkbox in the role editor (granting/revoking on a role is a no-op).
   basic?: boolean;
   implied_by?: string | null;
+  // Catalog metadata that hides the action from the role editor entirely (never
+  // rendered as a checkbox, never persisted). Orthogonal to `basic`/`implied_by`
+  // (which render a locked-but-visible checkbox). Defaults to false/absent.
+  system?: boolean;
 }
 
 export interface ResourceConfig {

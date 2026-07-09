@@ -1310,9 +1310,11 @@ const AppRouter = () => {
               <PrivateRoute>
                 <CustomerRoute>
                   <MainLayout>
-                    <PermissionRoute resource="dashboard" action="read">
-                      <Dashboard />
-                    </PermissionRoute>
+                    {/* No PermissionRoute: `dashboard.read` is a basic auth read,
+                        not a catalog resource, so `can('dashboard','read')` denies
+                        for everyone. Dashboard is the landing page — always visible
+                        to authenticated users (EVO-2071 AC7). */}
+                    <Dashboard />
                   </MainLayout>
                 </CustomerRoute>
               </PrivateRoute>

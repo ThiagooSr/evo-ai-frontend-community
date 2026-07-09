@@ -29,6 +29,16 @@
     "system": "Sistema",
     "custom": "Personalizzato"
   },
+  "domains": {
+    "attendance": "Assistenza",
+    "contacts": "Contatti",
+    "crm": "CRM",
+    "automation": "Automazione",
+    "ai": "IA",
+    "channels": "Canali",
+    "admin": "Amministrazione",
+    "others": "Altri"
+  },
   "detail": {
     "permissionsTitle": "Permessi",
     "permissionsDescription": "Seleziona i permessi che questo profilo deve avere. Le modifiche hanno effetto al prossimo accesso dell'utente.",
@@ -36,6 +46,12 @@
     "selectAll": "Seleziona tutti",
     "deselectAll": "Deseleziona tutti",
     "noPermissions": "Nessun permesso disponibile.",
+    "filterPlaceholder": "Cerca permessi...",
+    "nested": {
+      "pipelineStages": "Fasi",
+      "workingHours": "Orari di lavoro",
+      "inboxTemplates": "Modelli"
+    },
     "lock": {
       "basic": "Concessa a tutti gli utenti autenticati",
       "impliedBy": "Implicita da {{source}}",

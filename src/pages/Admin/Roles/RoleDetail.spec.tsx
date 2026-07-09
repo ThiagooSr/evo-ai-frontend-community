@@ -73,6 +73,62 @@ vi.mock('@/services/permissions', () => ({
               read: { name: 'View', description: '', basic: false, implied_by: 'conversations.read' },
             },
           },
+          // CRM domain, with a nested child (pipeline_stages under pipelines).
+          pipelines: {
+            name: 'Pipelines',
+            description: '',
+            actions: {
+              read: { name: 'View', description: '', basic: false, implied_by: null },
+            },
+          },
+          pipeline_stages: {
+            name: 'Pipeline Stages',
+            description: '',
+            actions: {
+              read: { name: 'View', description: '', basic: false, implied_by: null },
+            },
+          },
+          // Channels domain: nested child (working_hours) + an inbox template action.
+          inboxes: {
+            name: 'Inboxes',
+            description: '',
+            actions: {
+              read: { name: 'View', description: '', basic: false, implied_by: null },
+              message_templates: { name: 'List templates', description: '', basic: false, implied_by: null },
+            },
+          },
+          working_hours: {
+            name: 'Working Hours',
+            description: '',
+            actions: {
+              read: { name: 'View', description: '', basic: false, implied_by: null },
+            },
+          },
+          // AI domain: a normal action next to a system action (leak guard).
+          ai_agents: {
+            name: 'AI Agents',
+            description: '',
+            actions: {
+              read: { name: 'View', description: 'Manage AI robots', basic: false, implied_by: null },
+              secret_sync: { name: 'Secret sync', description: '', system: true },
+            },
+          },
+          // 100% system resource — its card must not render (AC3).
+          installation_configs: {
+            name: 'Installation Configs',
+            description: '',
+            actions: {
+              manage: { name: 'Manage', description: '', system: true },
+            },
+          },
+          // Fake resource absent from every domain → falls into "Others" (NFR4).
+          zzz_new_feature: {
+            name: 'Future Feature',
+            description: '',
+            actions: {
+              read: { name: 'View', description: '', basic: false, implied_by: null },
+            },
+          },
         },
       },
     }),
@@ -170,5 +226,104 @@ describe('RoleDetail — locked basic/implied permissions', () => {
     expect(savedKeys).toContain('users.read');
     expect(savedKeys).toContain('labels.create');
     expect(savedKeys).not.toContain('labels.read');
+  });
+});
+
+// EVO-2071: presentation-only regrouping of the role editor by domain, with a
+// future-proof "Others" fallback, hidden system actions, a text filter, and
+// visual nesting. No enforcement/lock behaviour changes (covered above).
+describe('RoleDetail — domain grouping, system filter, search, nesting', () => {
+  // In the DOM, does `a` come before `b`?
+  const precedes = (a: Element, b: Element) =>
+    Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it('renders resources grouped under domain headers in the curated order (AC1)', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('conversations.read')).not.toBeNull());
+
+    const attendance = screen.getByText('domains.attendance');
+    const crm = screen.getByText('domains.crm');
+    const ai = screen.getByText('domains.ai');
+    const channels = screen.getByText('domains.channels');
+    const admin = screen.getByText('domains.admin');
+    const others = screen.getByText('domains.others');
+
+    // Curated order: attendance → crm → ai → channels → admin → others.
+    expect(precedes(attendance, crm)).toBe(true);
+    expect(precedes(crm, ai)).toBe(true);
+    expect(precedes(ai, channels)).toBe(true);
+    expect(precedes(channels, admin)).toBe(true);
+    expect(precedes(admin, others)).toBe(true);
+
+    // Empty domains (no present resource) never render a header.
+    expect(screen.queryByText('domains.contacts')).toBeNull();
+    expect(screen.queryByText('domains.automation')).toBeNull();
+  });
+
+  it('places a catalog resource outside every domain under "Others" (NFR4/AC2)', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('zzz_new_feature.read')).not.toBeNull());
+    expect(screen.getByText('domains.others')).toBeTruthy();
+    // The fake resource is claimed by "Others", after every real domain.
+    expect(precedes(screen.getByText('domains.admin'), screen.getByText('domains.others'))).toBe(true);
+  });
+
+  it('hides system actions and drops a fully-system resource card (AC3)', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('ai_agents.read')).not.toBeNull());
+
+    // System action → no checkbox at all.
+    expect(cb('ai_agents.secret_sync')).toBeNull();
+    // Resource with only system actions → no card (no rows, no select-all).
+    expect(cb('installation_configs.manage')).toBeNull();
+    expect(cb('resource-installation_configs')).toBeNull();
+  });
+
+  it('never leaks a system key into the payload via the card select-all (AC3/NFR1)', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('resource-ai_agents')).not.toBeNull());
+
+    // "Select all" on a card that mixes a normal + a system action.
+    await userEvent.click(cb('resource-ai_agents') as HTMLElement);
+    expect(cb('ai_agents.read')).toHaveAttribute('data-state', 'checked');
+
+    await userEvent.click(screen.getByText('savePermissions'));
+    await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
+    const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
+    expect(savedKeys).toContain('ai_agents.read');
+    expect(savedKeys).not.toContain('ai_agents.secret_sync');
+  });
+
+  it('filters resources/domains by resource name, action name, or description (AC4)', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('conversations.read')).not.toBeNull());
+
+    // "robots" only appears in ai_agents.read's description.
+    await userEvent.type(screen.getByPlaceholderText('detail.filterPlaceholder'), 'robots');
+
+    await waitFor(() => expect(cb('conversations.read')).toBeNull());
+    expect(cb('ai_agents.read')).not.toBeNull();
+    // Domains with no surviving resource disappear.
+    expect(screen.queryByText('domains.attendance')).toBeNull();
+    expect(screen.getByText('domains.ai')).toBeTruthy();
+  });
+
+  it('nests pipeline_stages and working_hours inside their parent cards (AC6)', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('pipelines.read')).not.toBeNull());
+
+    // Nested action rows render (keys unchanged)...
+    expect(cb('pipeline_stages.read')).not.toBeNull();
+    expect(cb('working_hours.read')).not.toBeNull();
+    // ...but never as their own resource card (no card-level select-all).
+    expect(cb('resource-pipeline_stages')).toBeNull();
+    expect(cb('resource-working_hours')).toBeNull();
+
+    // Sub-labels for the nested blocks and inbox templates are present.
+    expect(screen.getByText('detail.nested.pipelineStages')).toBeTruthy();
+    expect(screen.getByText('detail.nested.workingHours')).toBeTruthy();
+    expect(screen.getByText('detail.nested.inboxTemplates')).toBeTruthy();
+    // The inbox template action is grouped, still keyed under inboxes.*.
+    expect(cb('inboxes.message_templates')).not.toBeNull();
   });
 });

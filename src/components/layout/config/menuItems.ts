@@ -64,11 +64,14 @@ export interface ProfileMenuItem {
 
 export const getCustomerMenuItems = (t: (key: string) => string): MenuItem[] => [
   {
+    // `dashboard.read` is not a catalog resource — it lives in the auth
+    // BASIC_READ_PERMISSIONS (every authenticated user holds it, it is the
+    // landing page). Gating on it made `can()` deny for everyone (a key outside
+    // the catalog is invalid), hiding the Dashboard from all users. No gate:
+    // always visible to authenticated users (EVO-2071 AC7).
     name: t('menu.customer.dashboard'),
     href: '/dashboard',
     icon: PieChart,
-    resource: 'dashboard',
-    action: 'read',
   },
   {
     name: t('menu.customer.conversations'),

@@ -16,10 +16,22 @@ import {
 } from '@evoapi/design-system';
 import { ArrowLeft, Loader2, Pencil, Save, X } from 'lucide-react';
 import BaseHeader from '@/components/base/BaseHeader';
+import { TooltipInfo } from '@/components/base/TooltipInfo';
 import { rolesService, type Role } from '@/services/roles/rolesService';
 import { permissionsService } from '@/services/permissions';
 import { usePermissions } from '@/contexts/PermissionsContext';
 import type { ResourceActionsData } from '@/types/auth/permissions';
+import {
+  groupResourcesByDomain,
+  RESOURCE_NESTING,
+  INBOX_TEMPLATE_ACTIONS,
+} from '@/config/permissionDomains';
+
+// Nested resource -> i18n key for its sub-label inside the parent card (AC6).
+const NESTED_LABEL_KEYS: Record<string, string> = {
+  pipeline_stages: 'detail.nested.pipelineStages',
+  working_hours: 'detail.nested.workingHours',
+};
 
 export default function RoleDetail() {
   const { id } = useParams<{ id: string }>();
@@ -30,6 +42,7 @@ export default function RoleDetail() {
   const [role, setRole] = useState<Role | null>(null);
   const [resourceActions, setResourceActions] = useState<ResourceActionsData | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingMeta, setEditingMeta] = useState(false);
@@ -97,7 +110,11 @@ export default function RoleDetail() {
   const toggleResource = (resource: string) => {
     if (!resourceActions) return;
     setSelected(prev => {
-      const keys = Object.keys(resourceActions.resources[resource]?.actions ?? {})
+      const actions = resourceActions.resources[resource]?.actions ?? {};
+      const keys = Object.keys(actions)
+        // System actions are never editable and must not leak into the payload
+        // via "select all" (AC3 / NFR1).
+        .filter(a => actions[a].system !== true)
         .map(a => `${resource}.${a}`)
         .filter(k => !isKeyLocked(k, prev));
       const allSelected = keys.length > 0 && keys.every(k => prev.has(k));
@@ -114,11 +131,14 @@ export default function RoleDetail() {
       const knownKeys = Array.from(selected).filter(key => {
         const [resource, action] = key.split('.');
         const cfg = resourceActions.resources[resource]?.actions?.[action];
-        // Persist only real, manageable grants: skip unknown keys and locked
-        // ones. A basic permission is always locked; an implied one is locked
-        // only while its source grant is selected — otherwise it is a genuine,
-        // persistable grant.
-        return cfg !== undefined && !isKeyLocked(key, selected);
+        // Persist only real, manageable grants: skip unknown keys, system keys,
+        // and locked ones. A basic permission is always locked; an implied one
+        // is locked only while its source grant is selected — otherwise it is a
+        // genuine, persistable grant. `!cfg.system` is defense-in-depth: system
+        // actions have no checkbox and are excluded from "select all", so they
+        // should never reach `selected`, but a stale grant from the DB must not
+        // be re-persisted either.
+        return cfg !== undefined && cfg.system !== true && !isKeyLocked(key, selected);
       });
       const updated = await rolesService.bulkUpdatePermissions(role.id, knownKeys);
       setRole(updated);
@@ -174,6 +194,147 @@ export default function RoleDetail() {
   const canEdit = can('roles', 'bulk_update_permissions');
   const canUpdate = can('roles', 'update');
   const resources = resourceActions.resources;
+
+  const term = filter.trim().toLowerCase();
+  const domains = groupResourcesByDomain(Object.keys(resources));
+
+  // Case-insensitive match over the resource name + action name + description
+  // (AC4). Runs AFTER the system filter, so hidden actions never match.
+  const passesFilter = (resourceName: string, actionName: string, description: string): boolean => {
+    if (!term) return true;
+    return (
+      resourceName.toLowerCase().includes(term) ||
+      actionName.toLowerCase().includes(term) ||
+      description.toLowerCase().includes(term)
+    );
+  };
+
+  // Visible action keys for a resource, restricted to `actionKeys`: drop system
+  // actions (AC3), then apply the text filter (AC4). Order is preserved.
+  const visibleActionKeys = (resourceKey: string, actionKeys: string[]): string[] => {
+    const resourceConfig = resources[resourceKey];
+    if (!resourceConfig) return [];
+    return actionKeys.filter(a => {
+      const cfg = resourceConfig.actions[a];
+      if (!cfg || cfg.system === true) return false;
+      return passesFilter(resourceConfig.name, cfg.name, cfg.description ?? '');
+    });
+  };
+
+  const renderActionRow = (resourceKey: string, actionKey: string) => {
+    const actionConfig = resources[resourceKey].actions[actionKey];
+    const key = `${resourceKey}.${actionKey}`;
+    const locked = isKeyLocked(key, selected);
+    const lockLabel = locked
+      ? actionConfig.basic
+        ? t('detail.lock.basic')
+        : t('detail.lock.impliedBy', { source: actionConfig.implied_by ?? '' })
+      : undefined;
+    return (
+      <div key={key} className="flex items-center gap-2 py-0.5">
+        <Checkbox
+          id={key}
+          // Locked perms are always effectively granted, so render them checked
+          // and never editable.
+          checked={locked || selected.has(key)}
+          onCheckedChange={canEdit && !locked ? () => togglePermission(key) : undefined}
+          disabled={!canEdit || locked}
+        />
+        <Label
+          htmlFor={key}
+          className={`text-sm font-normal text-sidebar-foreground/80 ${canEdit && !locked ? 'cursor-pointer' : ''}`}
+        >
+          {actionConfig.name}
+        </Label>
+        {actionConfig.description && (
+          <TooltipInfo title={actionConfig.name} content={actionConfig.description} />
+        )}
+        {locked && (
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4" title={lockLabel}>
+            {actionConfig.basic ? t('detail.lock.basicBadge') : t('detail.lock.impliedBadge')}
+          </Badge>
+        )}
+      </div>
+    );
+  };
+
+  // A sub-block: a translated label followed by a set of action rows (used for
+  // inbox templates and nested child resources — AC6).
+  const renderSubBlock = (labelKey: string, resourceKey: string, actionKeys: string[]) => (
+    <div key={`${resourceKey}:${labelKey}`} className="pt-1">
+      <p className="text-xs font-medium text-sidebar-foreground/50 pt-1">{t(labelKey)}</p>
+      {actionKeys.map(a => renderActionRow(resourceKey, a))}
+    </div>
+  );
+
+  const renderResourceCard = (resourceKey: string) => {
+    const resourceConfig = resources[resourceKey];
+    if (!resourceConfig) return null;
+
+    const nonSystemKeys = Object.keys(resourceConfig.actions).filter(
+      a => resourceConfig.actions[a].system !== true,
+    );
+
+    // Card "select all" governs only this resource's own manageable (non-system,
+    // non-locked) actions — independent of the text filter.
+    const manageableKeys = nonSystemKeys
+      .filter(a => !isKeyLocked(`${resourceKey}.${a}`, selected))
+      .map(a => `${resourceKey}.${a}`);
+    const allChecked = manageableKeys.length > 0 && manageableKeys.every(k => selected.has(k));
+    const someChecked = manageableKeys.some(k => selected.has(k));
+
+    // Inbox template actions get their own sub-label inside the inboxes card (AC6).
+    const isInbox = resourceKey === 'inboxes';
+    const templateSet = new Set(INBOX_TEMPLATE_ACTIONS);
+    const regularKeys = isInbox ? nonSystemKeys.filter(a => !templateSet.has(a)) : nonSystemKeys;
+    const templateKeys = isInbox ? nonSystemKeys.filter(a => templateSet.has(a)) : [];
+
+    // Child resources nested inside this card (pipeline_stages, working_hours).
+    const nestedChildren = Object.entries(RESOURCE_NESTING)
+      .filter(([, parent]) => parent === resourceKey)
+      .map(([child]) => child)
+      .filter(child => resources[child]);
+
+    const visibleRegular = visibleActionKeys(resourceKey, regularKeys);
+    const visibleTemplate = visibleActionKeys(resourceKey, templateKeys);
+    const visibleNested = nestedChildren
+      .map(child => ({ child, keys: visibleActionKeys(child, Object.keys(resources[child].actions)) }))
+      .filter(n => n.keys.length > 0);
+
+    // No visible rows at all (all system, or filtered out) → no card (AC3, AC4).
+    if (visibleRegular.length === 0 && visibleTemplate.length === 0 && visibleNested.length === 0) {
+      return null;
+    }
+
+    return (
+      <Card key={resourceKey} className="overflow-hidden border-sidebar-border bg-sidebar">
+        <CardHeader className="pb-2 pt-3 px-4 border-b border-sidebar-border bg-sidebar-accent/30">
+          <div className="flex items-center gap-2">
+            {canEdit && manageableKeys.length > 0 && (
+              <Checkbox
+                id={`resource-${resourceKey}`}
+                checked={allChecked}
+                data-indeterminate={!allChecked && someChecked}
+                onCheckedChange={() => toggleResource(resourceKey)}
+                className="shrink-0"
+              />
+            )}
+            <CardTitle className="text-sm font-medium text-sidebar-foreground">
+              {resourceConfig.name}
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="px-4 py-2 space-y-1">
+          {visibleRegular.map(a => renderActionRow(resourceKey, a))}
+          {visibleTemplate.length > 0 &&
+            renderSubBlock('detail.nested.inboxTemplates', resourceKey, visibleTemplate)}
+          {visibleNested.map(({ child, keys }) =>
+            renderSubBlock(NESTED_LABEL_KEYS[child], child, keys),
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="h-full flex flex-col p-4">
@@ -257,77 +418,29 @@ export default function RoleDetail() {
         {Object.keys(resources).length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('detail.noPermissions')}</p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {Object.entries(resources).map(([resourceKey, resourceConfig]) => {
-              const actions = Object.entries(resourceConfig.actions);
-              // The resource-level "select all" only governs the manageable
-              // (non-locked) actions; locked ones are always effectively on.
-              const manageableKeys = actions
-                .filter(([a]) => !isKeyLocked(`${resourceKey}.${a}`, selected))
-                .map(([a]) => `${resourceKey}.${a}`);
-              const allChecked =
-                manageableKeys.length > 0 && manageableKeys.every(k => selected.has(k));
-              const someChecked = manageableKeys.some(k => selected.has(k));
-
+          <div className="space-y-6">
+            <Input
+              value={filter}
+              onChange={e => setFilter(e.target.value)}
+              placeholder={t('detail.filterPlaceholder')}
+              className="max-w-sm"
+            />
+            {domains.map(domain => {
+              // A domain shows only when at least one of its resources renders a
+              // card (after the system and text filters) — AC4.
+              const cards = domain.resources
+                .map(resourceKey => renderResourceCard(resourceKey))
+                .filter(Boolean);
+              if (cards.length === 0) return null;
               return (
-                <Card key={resourceKey} className="overflow-hidden border-sidebar-border bg-sidebar">
-                  <CardHeader className="pb-2 pt-3 px-4 border-b border-sidebar-border bg-sidebar-accent/30">
-                    <div className="flex items-center gap-2">
-                      {canEdit && manageableKeys.length > 0 && (
-                        <Checkbox
-                          id={`resource-${resourceKey}`}
-                          checked={allChecked}
-                          data-indeterminate={!allChecked && someChecked}
-                          onCheckedChange={() => toggleResource(resourceKey)}
-                          className="shrink-0"
-                        />
-                      )}
-                      <CardTitle className="text-sm font-medium text-sidebar-foreground">
-                        {resourceConfig.name}
-                      </CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="px-4 py-2 space-y-1">
-                    {actions.map(([actionKey, actionConfig]) => {
-                      const key = `${resourceKey}.${actionKey}`;
-                      const locked = isKeyLocked(key, selected);
-                      const lockLabel = locked
-                        ? actionConfig.basic
-                          ? t('detail.lock.basic')
-                          : t('detail.lock.impliedBy', { source: actionConfig.implied_by ?? '' })
-                        : undefined;
-                      return (
-                        <div key={key} className="flex items-center gap-2 py-0.5">
-                          <Checkbox
-                            id={key}
-                            // Locked perms are always effectively granted, so render
-                            // them checked and never editable.
-                            checked={locked || selected.has(key)}
-                            onCheckedChange={
-                              canEdit && !locked ? () => togglePermission(key) : undefined
-                            }
-                            disabled={!canEdit || locked}
-                          />
-                          <Label
-                            htmlFor={key}
-                            className={`text-sm font-normal text-sidebar-foreground/80 ${canEdit && !locked ? 'cursor-pointer' : ''}`}
-                          >
-                            {actionConfig.name}
-                          </Label>
-                          {locked && (
-                            <Badge
-                              variant="secondary"
-                              className="text-[10px] px-1.5 py-0 h-4"
-                              title={lockLabel}
-                            >
-                              {actionConfig.basic ? t('detail.lock.basicBadge') : t('detail.lock.impliedBadge')}
-                            </Badge>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
+                <div key={domain.key} className="space-y-3">
+                  <h3 className="text-sm font-semibold text-sidebar-foreground/70">
+                    {t(domain.labelKey)}
+                  </h3>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {cards}
+                  </div>
+                </div>
               );
             })}
           </div>

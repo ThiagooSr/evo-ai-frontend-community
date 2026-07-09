@@ -29,6 +29,16 @@
     "system": "System",
     "custom": "Custom"
   },
+  "domains": {
+    "attendance": "Attendance",
+    "contacts": "Contacts",
+    "crm": "CRM",
+    "automation": "Automation",
+    "ai": "AI",
+    "channels": "Channels",
+    "admin": "Administration",
+    "others": "Others"
+  },
   "detail": {
     "permissionsTitle": "Permissions",
     "permissionsDescription": "Check the permissions this role should have. Changes take effect on the user's next session refresh.",
@@ -36,6 +46,12 @@
     "selectAll": "Select all",
     "deselectAll": "Deselect all",
     "noPermissions": "No permissions available.",
+    "filterPlaceholder": "Search permissions...",
+    "nested": {
+      "pipelineStages": "Stages",
+      "workingHours": "Working hours",
+      "inboxTemplates": "Templates"
+    },
     "lock": {
       "basic": "Granted to every authenticated user",
       "impliedBy": "Implied by {{source}}",
