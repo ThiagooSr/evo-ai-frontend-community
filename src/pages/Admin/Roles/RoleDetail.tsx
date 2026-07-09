@@ -5,16 +5,12 @@ import { toast } from 'sonner';
 import {
   Badge,
   Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
   Checkbox,
   Input,
   Label,
   Textarea,
 } from '@evoapi/design-system';
-import { ArrowLeft, Loader2, Pencil, Save, X } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Loader2, Pencil, Save, X } from 'lucide-react';
 import BaseHeader from '@/components/base/BaseHeader';
 import { TooltipInfo } from '@/components/base/TooltipInfo';
 import { rolesService, type Role } from '@/services/roles/rolesService';
@@ -46,6 +42,8 @@ export default function RoleDetail() {
   const [resourceActions, setResourceActions] = useState<ResourceActionsData | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
+  // Collapsed domains. Sections start open; a search forces them open anyway.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingMeta, setEditingMeta] = useState(false);
@@ -124,6 +122,58 @@ export default function RoleDetail() {
       const allSelected = keys.length > 0 && keys.every(k => prev.has(k));
       const next = new Set(prev);
       allSelected ? keys.forEach(k => next.delete(k)) : keys.forEach(k => next.add(k));
+      return next;
+    });
+  };
+
+  // Nested children render inside their parent's row but are separate resources, so
+  // a "select all" that skipped them would leave half the screen untouched.
+  const childrenOf = (resourceKey: string): string[] =>
+    Object.entries(RESOURCE_NESTING)
+      .filter(([, parent]) => parent === resourceKey)
+      .map(([child]) => child)
+      .filter(child => resourceActions?.resources[child]);
+
+  // Every key a bulk toggle owns: not system, not hidden. Lock is deliberately NOT
+  // consulted here. A lock can flip mid-operation — granting conversations.read locks
+  // users.read — and a set computed against the old selection would skip the key on
+  // the way back, stranding it. Granting or revoking a locked key is harmless anyway:
+  // `handleSave` never persists one.
+  const bulkKeysOf = (resourceKey: string): string[] => {
+    const cfg = resourceActions?.resources[resourceKey];
+    if (!cfg) return [];
+    return Object.keys(cfg.actions)
+      .filter(a => cfg.actions[a].system !== true && !isHiddenAction(resourceKey, a))
+      .map(a => `${resourceKey}.${a}`);
+  };
+
+  const keysOfResources = (resourceKeys: string[]): string[] =>
+    resourceKeys.flatMap(r => [r, ...childrenOf(r)]).flatMap(bulkKeysOf);
+
+  const toggleKeys = (keys: string[]) => {
+    if (keys.length === 0) return;
+    setSelected(prev => {
+      const allSelected = keys.every(k => prev.has(k));
+      const next = new Set(prev);
+      allSelected ? keys.forEach(k => next.delete(k)) : keys.forEach(k => next.add(k));
+      return next;
+    });
+  };
+
+  // The checkbox reflects only what the admin can actually decide, so a basic or
+  // implied key never leaves it stuck as indeterminate.
+  const bulkState = (keys: string[]) => {
+    const decidable = keys.filter(k => !isKeyLocked(k, selected));
+    return {
+      all: decidable.length > 0 && decidable.every(k => selected.has(k)),
+      some: decidable.some(k => selected.has(k)),
+    };
+  };
+
+  const toggleDomain = (domainKey: string) => {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      next.has(domainKey) ? next.delete(domainKey) : next.add(domainKey);
       return next;
     });
   };
@@ -263,28 +313,30 @@ export default function RoleDetail() {
     });
   };
 
-  const renderGroupRow = (resourceKey: string, group: ActionGroup) => {
+  // nome | Read | Write | Delete | extras. Shared by the header and every row so the
+  // columns line up even when a resource has no key of a given kind.
+  const ROW_GRID =
+    'grid grid-cols-[minmax(9rem,18rem)_4.5rem_4.5rem_4.5rem_minmax(0,1fr)] items-center gap-x-2';
+
+  const renderGroupCell = (resourceKey: string, group: ActionGroup | undefined) => {
+    if (!group) {
+      // The resource has no key of this kind — an empty cell, not a missing column.
+      return <span className="text-center text-sidebar-foreground/20">–</span>;
+    }
     const keys = groupKeys(resourceKey, group.actions);
-    if (keys.length === 0) return null;
     const id = `group-${resourceKey}-${group.key}`;
     const allChecked = keys.every(k => selected.has(k));
     const someChecked = !allChecked && keys.some(k => selected.has(k));
     return (
-      <div key={id} className="flex items-center gap-2 py-0.5">
+      <div className="flex justify-center">
         <Checkbox
           id={id}
+          aria-label={t(group.labelKey)}
           checked={allChecked}
           data-indeterminate={someChecked}
           onCheckedChange={canEdit ? () => toggleGroup(resourceKey, group.actions) : undefined}
           disabled={!canEdit}
         />
-        <Label
-          htmlFor={id}
-          className={`text-sm font-normal text-sidebar-foreground/80 ${canEdit ? 'cursor-pointer' : ''}`}
-        >
-          {t(group.labelKey)}
-        </Label>
-        <TooltipInfo title={t(group.labelKey)} content={t(`${group.labelKey}Description`)} />
       </div>
     );
   };
@@ -311,7 +363,7 @@ export default function RoleDetail() {
         : t('detail.lock.impliedBy', { source: actionConfig.implied_by ?? '' })
       : undefined;
     return (
-      <div key={key} className="flex items-center gap-2 py-0.5">
+      <div key={key} className="flex items-center gap-1.5">
         <Checkbox
           id={key}
           // Locked perms are always effectively granted, so render them checked
@@ -326,9 +378,6 @@ export default function RoleDetail() {
         >
           {actionConfig.name}
         </Label>
-        {actionConfig.description && (
-          <TooltipInfo title={actionConfig.name} content={actionConfig.description} />
-        )}
         {locked && (
           <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4" title={lockLabel}>
             {actionConfig.basic ? t('detail.lock.basicBadge') : t('detail.lock.impliedBadge')}
@@ -337,15 +386,6 @@ export default function RoleDetail() {
       </div>
     );
   };
-
-  // A sub-block: a translated label followed by a set of action rows (used for
-  // inbox templates and nested child resources — AC6).
-  const renderSubBlock = (labelKey: string, resourceKey: string, rows: React.ReactNode) => (
-    <div key={`${resourceKey}:${labelKey}`} className="pt-1">
-      <p className="text-xs font-medium text-sidebar-foreground/50 pt-1">{t(labelKey)}</p>
-      {rows}
-    </div>
-  );
 
   const renderResourceCard = (resourceKey: string) => {
     const resourceConfig = resources[resourceKey];
@@ -390,9 +430,11 @@ export default function RoleDetail() {
       return null;
     }
 
+    const groupBy = (k: ActionGroup['key']) => visibleGroups.find(g => g.key === k);
+
     return (
-      <Card key={resourceKey} className="overflow-hidden border-sidebar-border bg-sidebar">
-        <CardHeader className="pb-2 pt-3 px-4 border-b border-sidebar-border bg-sidebar-accent/30">
+      <div key={resourceKey} className="border-b border-sidebar-border/30 last:border-0">
+        <div className={`${ROW_GRID} py-1`}>
           <div className="flex items-center gap-2">
             {canEdit && manageableKeys.length > 0 && (
               <Checkbox
@@ -403,28 +445,50 @@ export default function RoleDetail() {
                 className="shrink-0"
               />
             )}
-            <CardTitle className="text-sm font-medium text-sidebar-foreground">
-              {resourceConfig.name}
-            </CardTitle>
+            <span className="truncate text-sm text-sidebar-foreground">{resourceConfig.name}</span>
           </div>
-        </CardHeader>
-        <CardContent className="px-4 py-2 space-y-1">
-          {visibleGroups.map(g => renderGroupRow(resourceKey, g))}
-          {visibleStandalone.map(a => renderActionRow(resourceKey, a))}
-          {visibleNested.map(({ child, groups, standalone }) =>
-            renderSubBlock(
-              NESTED_LABEL_KEYS[child],
-              child,
-              <>
-                {groups.map(g => renderGroupRow(child, g))}
+          {renderGroupCell(resourceKey, groupBy('read'))}
+          {renderGroupCell(resourceKey, groupBy('write'))}
+          {renderGroupCell(resourceKey, groupBy('delete'))}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            {visibleStandalone.map(a => renderActionRow(resourceKey, a))}
+          </div>
+        </div>
+        {visibleNested.map(({ child, groups, standalone }) => {
+          const childBy = (k: ActionGroup['key']) => groups.find(g => g.key === k);
+          return (
+            <div key={child} className={`${ROW_GRID} pb-1`}>
+              <span className="truncate pl-8 text-xs text-sidebar-foreground/50">
+                {t(NESTED_LABEL_KEYS[child])}
+              </span>
+              {renderGroupCell(child, childBy('read'))}
+              {renderGroupCell(child, childBy('write'))}
+              {renderGroupCell(child, childBy('delete'))}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 {standalone.map(a => renderActionRow(child, a))}
-              </>,
-            ),
-          )}
-        </CardContent>
-      </Card>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     );
   };
+
+  // Render each domain's rows once, so the section and global "select all" own
+  // exactly the resources on screen — a search must not let them toggle rows the
+  // admin cannot see.
+  const renderedDomains = domains
+    .map(domain => {
+      const items = domain.resources
+        .map(resourceKey => ({ resourceKey, node: renderResourceCard(resourceKey) }))
+        .filter(item => item.node !== null);
+      return { domain, items };
+    })
+    .filter(({ items }) => items.length > 0);
+
+  const allVisibleKeys = keysOfResources(
+    renderedDomains.flatMap(({ items }) => items.map(i => i.resourceKey)),
+  );
 
   return (
     <div className="h-full flex flex-col p-4">
@@ -509,27 +573,90 @@ export default function RoleDetail() {
           <p className="text-sm text-muted-foreground">{t('detail.noPermissions')}</p>
         ) : (
           <div className="space-y-6">
-            <Input
-              value={filter}
-              onChange={e => setFilter(e.target.value)}
-              placeholder={t('detail.filterPlaceholder')}
-              className="max-w-sm"
-            />
-            {domains.map(domain => {
-              // A domain shows only when at least one of its resources renders a
-              // card (after the system and text filters) — AC4.
-              const cards = domain.resources
-                .map(resourceKey => renderResourceCard(resourceKey))
-                .filter(Boolean);
-              if (cards.length === 0) return null;
+            <div className="flex items-center gap-3">
+              <Input
+                value={filter}
+                onChange={e => setFilter(e.target.value)}
+                placeholder={t('detail.filterPlaceholder')}
+                className="max-w-sm"
+              />
+              {canEdit &&
+                (() => {
+                  const keys = allVisibleKeys;
+                  const { all, some } = bulkState(keys);
+                  return (
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="select-all-everything"
+                        checked={all}
+                        data-indeterminate={!all && some}
+                        onCheckedChange={() => toggleKeys(keys)}
+                      />
+                      <Label htmlFor="select-all-everything" className="cursor-pointer text-sm font-normal">
+                        {all ? t('detail.deselectAll') : t('detail.selectAll')}
+                      </Label>
+                    </div>
+                  );
+                })()}
+            </div>
+            {renderedDomains.map(({ domain, items }) => {
+              const cards = items.map(i => i.node);
+              // A search must never hide its own results behind a collapsed section.
+              const open = term ? true : !collapsed.has(domain.key);
+              const domainKeys = keysOfResources(items.map(i => i.resourceKey));
+              const domainState = bulkState(domainKeys);
               return (
-                <div key={domain.key} className="space-y-3">
-                  <h3 className="text-sm font-semibold text-sidebar-foreground/70">
-                    {t(domain.labelKey)}
-                  </h3>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {cards}
+                <div key={domain.key} className="space-y-2">
+                  <div className="flex items-center gap-2 py-1">
+                    {canEdit && domainKeys.length > 0 && (
+                      <Checkbox
+                        id={`select-all-${domain.key}`}
+                        aria-label={t('detail.selectAll')}
+                        checked={domainState.all}
+                        data-indeterminate={!domainState.all && domainState.some}
+                        onCheckedChange={() => toggleKeys(domainKeys)}
+                        className="shrink-0"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => toggleDomain(domain.key)}
+                      aria-expanded={open}
+                      className="flex flex-1 items-center gap-2 text-left text-sm font-semibold text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                    >
+                      {open ? (
+                        <ChevronDown className="h-4 w-4 shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 shrink-0" />
+                      )}
+                      {t(domain.labelKey)}
+                      <span className="text-xs font-normal text-sidebar-foreground/40">
+                        {cards.length}
+                      </span>
+                    </button>
                   </div>
+                  {open && (
+                    <div className="rounded-md border border-sidebar-border/40 bg-sidebar px-3">
+                      {/* Column labels and their tooltips live here, once per section,
+                          instead of being repeated on every row. */}
+                      <div
+                        className={`${ROW_GRID} border-b border-sidebar-border/40 py-1.5 text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/40`}
+                      >
+                        <span />
+                        {(['read', 'write', 'delete'] as const).map(key => (
+                          <div key={key} className="flex items-center justify-center gap-1">
+                            <span>{t(`detail.actionGroups.${key}`)}</span>
+                            <TooltipInfo
+                              title={t(`detail.actionGroups.${key}`)}
+                              content={t(`detail.actionGroups.${key}Description`)}
+                            />
+                          </div>
+                        ))}
+                        <span />
+                      </div>
+                      {cards}
+                    </div>
+                  )}
                 </div>
               );
             })}

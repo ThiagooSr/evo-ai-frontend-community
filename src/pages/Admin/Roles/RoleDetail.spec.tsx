@@ -369,6 +369,65 @@ describe('RoleDetail — action groups', () => {
   });
 });
 
+describe('RoleDetail — bulk select', () => {
+  it('the section checkbox grants every key of every resource in it, nested ones included', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('select-all-crm')).not.toBeNull());
+
+    await userEvent.click(cb('select-all-crm') as HTMLElement);
+    await userEvent.click(screen.getByText('savePermissions'));
+    await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
+
+    const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
+    expect(savedKeys).toContain('pipelines.read');
+    // pipeline_stages renders inside the pipelines row but is its own resource.
+    expect(savedKeys).toContain('pipeline_stages.read');
+    expect(savedKeys).toContain('pipeline_stages.create');
+    // Another section is untouched.
+    expect(savedKeys).not.toContain('conversations.read');
+  });
+
+  it('the top checkbox grants everything on screen, and clears it on the second click', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('select-all-everything')).not.toBeNull());
+
+    await userEvent.click(cb('select-all-everything') as HTMLElement);
+    await userEvent.click(screen.getByText('savePermissions'));
+    await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
+
+    const granted = bulkUpdateMock.mock.calls[0][1] as string[];
+    expect(granted).toEqual(
+      expect.arrayContaining(['conversations.read', 'pipelines.read', 'ai_agents.read']),
+    );
+    // Never a system key, never a hidden resource.
+    expect(granted).not.toContain('ai_agents.secret_sync');
+    expect(granted).not.toContain('oauth_applications.read');
+
+    bulkUpdateMock.mockClear();
+    await userEvent.click(cb('select-all-everything') as HTMLElement);
+    await userEvent.click(screen.getByText('savePermissions'));
+    await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
+    expect(bulkUpdateMock.mock.calls[0][1]).toEqual([]);
+  });
+
+  it('a filtered search narrows what the bulk checkboxes own', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('select-all-everything')).not.toBeNull());
+
+    await userEvent.type(screen.getByPlaceholderText('detail.filterPlaceholder'), 'Pipelines');
+    await waitFor(() => expect(cb('group-conversations-read')).toBeNull());
+
+    await userEvent.click(cb('select-all-everything') as HTMLElement);
+    await userEvent.click(screen.getByText('savePermissions'));
+    await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
+
+    const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
+    expect(savedKeys).toContain('pipelines.read');
+    // Filtered out of view → the bulk toggle must not have touched it.
+    expect(savedKeys).not.toContain('conversations.read');
+  });
+});
+
 describe('RoleDetail — domain grouping, system filter, search, nesting', () => {
   const precedes = (a: Element, b: Element) =>
     Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
