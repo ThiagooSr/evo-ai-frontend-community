@@ -61,7 +61,6 @@ const RESOURCE_DEFINITIONS = [
   { key: 'ai_custom_mcp_servers', actions: ['read', 'create', 'update', 'delete', 'test'], category: 'agents' as const },
   { key: 'ai_custom_tools', actions: ['read', 'create', 'update', 'delete', 'test'], category: 'agents' as const },
   { key: 'ai_clients', actions: ['read', 'usage', 'limits'], category: 'agents' as const },
-  { key: 'agents', actions: ['read', 'create', 'update', 'delete'], category: 'agents' as const },
   { key: 'agent_bots', actions: ['read', 'create', 'update', 'delete', 'avatar'], category: 'agents' as const },
   { key: 'agent_apikeys', actions: ['read', 'create', 'update', 'delete'], category: 'agents' as const },
   { key: 'agent_folders', actions: ['read', 'create', 'update', 'delete'], category: 'agents' as const },
