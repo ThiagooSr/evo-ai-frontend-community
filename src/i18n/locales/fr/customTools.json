@@ -199,7 +199,7 @@
   "testResult": {
     "titleSuccess": "Test réussi",
     "titleError": "Test échoué",
-    "statusCode": "Status code",
+    "statusCode": "Code de statut",
     "responseTime": "Temps de réponse",
     "errorLabel": "Erreur",
     "responseHeaders": "Headers de réponse",

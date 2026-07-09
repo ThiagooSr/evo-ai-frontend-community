@@ -5,6 +5,19 @@ import {
   type SubMenuItem,
 } from './menuItems';
 
+// EVO-2071 AC7: `dashboard.read` is not a catalog resource (it lives in the auth
+// BASIC_READ_PERMISSIONS). Gating the menu on it made `can()` deny for everyone,
+// hiding the Dashboard from all users. The gate is removed — Dashboard is a
+// top-level item, so locate it directly, not via findSubItem.
+describe('menuItems — Dashboard orphan gate removed (EVO-2071 AC7)', () => {
+  it('exposes Dashboard with no resource/action gate (always visible to authenticated users)', () => {
+    const dashboard = getCustomerMenuItems(t).find(i => i.href === '/dashboard');
+    expect(dashboard).toBeDefined();
+    expect(dashboard?.resource).toBeUndefined();
+    expect(dashboard?.action).toBeUndefined();
+  });
+});
+
 // Identity translator: returns the key itself so we can locate items by href.
 const t = (key: string) => key;
 
