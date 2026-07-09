@@ -62,17 +62,12 @@ const RESOURCE_DEFINITIONS = [
   { key: 'ai_custom_tools', actions: ['read', 'create', 'update', 'delete', 'test'], category: 'agents' as const },
   { key: 'ai_clients', actions: ['read', 'usage', 'limits'], category: 'agents' as const },
   { key: 'agent_bots', actions: ['read', 'create', 'update', 'delete', 'avatar'], category: 'agents' as const },
-  { key: 'agent_apikeys', actions: ['read', 'create', 'update', 'delete'], category: 'agents' as const },
-  { key: 'agent_folders', actions: ['read', 'create', 'update', 'delete'], category: 'agents' as const },
-  { key: 'agent_shared_folders', actions: ['read', 'create', 'update', 'delete'], category: 'agents' as const },
 
   // Settings / administration
   { key: 'accounts', actions: ['read', 'create', 'update', 'delete', 'stats', 'types'], category: 'settings' as const },
   { key: 'users', actions: ['read', 'create', 'update', 'delete', 'bulk_operations', 'stats', 'types', 'permissions', 'check_permission', 'destroy_access_token', 'remove_avatar', 'create_account_user', 'manage'], category: 'settings' as const },
   { key: 'profiles', actions: ['read', 'update', 'update_avatar', 'update_password', 'manage_notifications'], category: 'settings' as const },
-  { key: 'permissions', actions: ['read'], category: 'settings' as const },
   { key: 'teams', actions: ['read', 'create', 'update', 'delete'], category: 'settings' as const },
-  { key: 'team_members', actions: ['read', 'create', 'update', 'delete'], category: 'settings' as const },
   { key: 'roles', actions: ['read', 'create', 'update', 'delete', 'bulk_assign', 'bulk_update_permissions'], category: 'settings' as const },
   { key: 'labels', actions: ['read', 'create', 'update', 'delete'], category: 'settings' as const },
   { key: 'custom_attribute_definitions', actions: ['read', 'create', 'update', 'delete'], category: 'settings' as const },
@@ -88,16 +83,9 @@ const RESOURCE_DEFINITIONS = [
   { key: 'working_hours', actions: ['read', 'create', 'update', 'delete'], category: 'settings' as const },
   { key: 'installation_configs', actions: ['manage'], category: 'settings' as const },
 
-  // Other (reports, oauth resources, channel authorizations)
-  { key: 'reports', actions: ['read', 'export', 'create_custom'], category: 'other' as const },
-  { key: 'live_reports', actions: ['read', 'create', 'update', 'delete'], category: 'other' as const },
-  { key: 'summary_reports', actions: ['read', 'create', 'update', 'delete'], category: 'other' as const },
+  // Other (filters, templates, channel authorizations)
   { key: 'custom_filters', actions: ['read', 'create', 'update', 'delete'], category: 'other' as const },
   { key: 'templates', actions: ['read', 'export', 'import'], category: 'other' as const },
-  { key: 'oauth_contacts', actions: ['read', 'create', 'update', 'delete'], category: 'other' as const },
-  { key: 'oauth_agents', actions: ['read', 'create', 'update', 'delete'], category: 'other' as const },
-  { key: 'oauth_pipelines', actions: ['read', 'create', 'update', 'delete'], category: 'other' as const },
-  { key: 'oauth_pipeline_stages', actions: ['read', 'create', 'update', 'delete'], category: 'other' as const },
   { key: 'microsoft_authorizations', actions: ['read', 'create', 'update', 'delete'], category: 'other' as const },
   { key: 'google_authorizations', actions: ['read', 'create', 'update', 'delete'], category: 'other' as const },
   { key: 'instagram_authorizations', actions: ['read', 'create', 'update', 'delete'], category: 'other' as const },
