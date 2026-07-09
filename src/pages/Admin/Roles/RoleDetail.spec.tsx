@@ -129,6 +129,30 @@ vi.mock('@/services/permissions', () => ({
               read: { name: 'View', description: '', basic: false, implied_by: null },
             },
           },
+          // Hidden resources: the catalog still ships them, the editor must not.
+          oauth_applications: {
+            name: 'OAuth Applications',
+            description: '',
+            actions: {
+              read: { name: 'View', description: '', basic: false, implied_by: null },
+              create: { name: 'Create', description: '', basic: false, implied_by: null },
+            },
+          },
+          whatsapp_authorizations: {
+            name: 'WhatsApp Authorizations',
+            description: '',
+            actions: {
+              read: { name: 'View', description: '', basic: false, implied_by: null },
+              create: { name: 'Create', description: '', basic: false, implied_by: null },
+            },
+          },
+          ai_folders: {
+            name: 'AI Folders',
+            description: '',
+            actions: {
+              read: { name: 'View', description: '', basic: false, implied_by: null },
+            },
+          },
         },
       },
     }),
@@ -258,6 +282,48 @@ describe('RoleDetail — domain grouping, system filter, search, nesting', () =>
     // Empty domains (no present resource) never render a header.
     expect(screen.queryByText('domains.contacts')).toBeNull();
     expect(screen.queryByText('domains.automation')).toBeNull();
+  });
+
+  it('never renders a hidden resource, in any domain or under "Others"', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('conversations.read')).not.toBeNull());
+
+    ['oauth_applications', 'whatsapp_authorizations', 'ai_folders'].forEach(resource => {
+      expect(cb(`${resource}.read`)).toBeNull();
+      expect(cb(`resource-${resource}`)).toBeNull();
+    });
+    expect(screen.queryByText('OAuth Applications')).toBeNull();
+    expect(screen.queryByText('WhatsApp Authorizations')).toBeNull();
+    expect(screen.queryByText('AI Folders')).toBeNull();
+  });
+
+  it('hiding a resource does not revoke a grant the role already holds', async () => {
+    rolePermissions = { oauth_applications: ['read'], labels: ['create'] };
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('labels.create')).not.toBeNull());
+    expect(cb('oauth_applications.read')).toBeNull();
+
+    await userEvent.click(screen.getByText('savePermissions'));
+    await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
+    const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
+    expect(savedKeys).toContain('oauth_applications.read');
+  });
+
+  // Regression: bulk_update_permissions replaces the whole set, so omitting a held
+  // system key deletes it. ai_agent_processor.execute gates the chat WebSocket.
+  it('re-sends system grants the role already holds instead of stripping them', async () => {
+    rolePermissions = { ai_agents: ['read', 'secret_sync'], labels: ['create'] };
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('ai_agents.read')).not.toBeNull());
+
+    // Still no checkbox for it — hidden, but not forgotten.
+    expect(cb('ai_agents.secret_sync')).toBeNull();
+
+    await userEvent.click(screen.getByText('savePermissions'));
+    await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
+    const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
+    expect(savedKeys).toContain('ai_agents.secret_sync');
+    expect(savedKeys).toContain('ai_agents.read');
   });
 
   it('places a catalog resource outside every domain under "Others" (NFR4/AC2)', async () => {

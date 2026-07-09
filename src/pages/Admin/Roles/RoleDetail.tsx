@@ -131,14 +131,18 @@ export default function RoleDetail() {
       const knownKeys = Array.from(selected).filter(key => {
         const [resource, action] = key.split('.');
         const cfg = resourceActions.resources[resource]?.actions?.[action];
-        // Persist only real, manageable grants: skip unknown keys, system keys,
-        // and locked ones. A basic permission is always locked; an implied one
-        // is locked only while its source grant is selected — otherwise it is a
-        // genuine, persistable grant. `!cfg.system` is defense-in-depth: system
-        // actions have no checkbox and are excluded from "select all", so they
-        // should never reach `selected`, but a stale grant from the DB must not
-        // be re-persisted either.
-        return cfg !== undefined && cfg.system !== true && !isKeyLocked(key, selected);
+        // Persist only real grants: skip unknown keys and locked ones. A basic
+        // permission is always locked; an implied one is locked only while its
+        // source grant is selected — otherwise it is a genuine, persistable grant.
+        //
+        // System keys ARE re-sent when the role already holds them. The endpoint
+        // replaces the whole permission set, so omitting a held key deletes it:
+        // filtering them out here would silently strip every system grant on the
+        // first save — and ai_agent_processor.execute gates the chat WebSocket.
+        // Re-sending is safe because a system key can never enter `selected` by
+        // user action: it renders no checkbox and `toggleResource` skips it, so it
+        // is only ever there because the role already had it.
+        return cfg !== undefined && !isKeyLocked(key, selected);
       });
       const updated = await rolesService.bulkUpdatePermissions(role.id, knownKeys);
       setRole(updated);

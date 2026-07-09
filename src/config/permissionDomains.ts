@@ -77,6 +77,42 @@ export const INBOX_TEMPLATE_ACTIONS: string[] = [
   'delete_message_template',
 ];
 
+// Resources the role editor must not offer, because there is nothing for an admin
+// to grant. They stay in the auth catalog — services still enforce some of them, and
+// dropping a key would 403 those routes — but no user administers them here. They are
+// hidden from every domain AND from "Others": that fallback exists to surface
+// resources nobody has classified yet, not ones we know should not be there.
+//
+//   oauth_applications  the OAuth Apps screen has never been reachable — its
+//                       Integrations card is filtered out by `active? => false`
+//                       (hardcoded since the first community release).
+//   ai_folders          upstream Evo AI concept. No page, no menu entry, and not one
+//                       caller of agentService's folder functions.
+//   ai_mcp_servers      the built-in MCP server catalog, which users do not register.
+//                       (User-registered ones are ai_custom_mcp_servers.)
+//                       /agents/mcp-servers has never been in the menu.
+//   ai_clients          upstream multi-tenant leftover. Its one live key gates a
+//                       session counter against hard-coded limits, with no caller.
+//   *_authorizations    these name the OAuth handshake, not the thing it creates:
+//                       connecting a channel creates an inbox, and /channels/new
+//                       already requires inboxes.create. 15 of their 20 keys gate
+//                       nothing at all (the controllers define no index/show/
+//                       update/destroy action, and no route reaches one).
+//
+// Removing the keys, the endpoints and the dead screens is a follow-up; this keeps
+// them off the editor meanwhile.
+export const HIDDEN_RESOURCES = new Set<string>([
+  'oauth_applications',
+  'ai_folders',
+  'ai_mcp_servers',
+  'ai_clients',
+  'google_authorizations',
+  'instagram_authorizations',
+  'microsoft_authorizations',
+  'twitter_authorizations',
+  'whatsapp_authorizations',
+]);
+
 export interface DomainGroup {
   key: string;
   labelKey: string;
@@ -96,7 +132,9 @@ const NESTED_RESOURCES = new Set(Object.keys(RESOURCE_NESTING));
  * omitted.
  */
 export function groupResourcesByDomain(resourceKeys: string[]): DomainGroup[] {
-  const present = new Set(resourceKeys);
+  // Hidden resources never render, in any group — not even under "Others".
+  const visible = resourceKeys.filter(r => !HIDDEN_RESOURCES.has(r));
+  const present = new Set(visible);
   const claimed = new Set<string>();
   const groups: DomainGroup[] = [];
 
@@ -115,7 +153,7 @@ export function groupResourcesByDomain(resourceKeys: string[]): DomainGroup[] {
     }
   }
 
-  const others = resourceKeys.filter(r => !claimed.has(r) && !NESTED_RESOURCES.has(r));
+  const others = visible.filter(r => !claimed.has(r) && !NESTED_RESOURCES.has(r));
   if (others.length > 0) {
     groups.push({ key: 'others', labelKey: 'domains.others', resources: others });
   }
