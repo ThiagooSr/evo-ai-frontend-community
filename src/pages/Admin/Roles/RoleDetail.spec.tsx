@@ -54,7 +54,16 @@ vi.mock('@/services/permissions', () => ({
             name: 'Conversations',
             description: '',
             actions: {
+              // group "view"
               read: { name: 'View', description: '', basic: false, implied_by: null },
+              search: { name: 'Search', description: '', basic: false, implied_by: null },
+              attachments: { name: 'Attachments', description: '', basic: false, implied_by: null },
+              // group "write"
+              create: { name: 'Create', description: '', basic: false, implied_by: null },
+              update: { name: 'Update', description: '', basic: false, implied_by: null },
+              toggle_status: { name: 'Toggle status', description: '', basic: false, implied_by: null },
+              // ungrouped — renders its own row
+              delete: { name: 'Delete', description: '', basic: false, implied_by: null },
             },
           },
           labels: {
@@ -214,12 +223,12 @@ describe('RoleDetail — locked basic/implied permissions', () => {
     expect(cb('users.read')).not.toBeDisabled();
 
     // Grant the source → implied becomes locked + checked.
-    await userEvent.click(cb('conversations.read') as HTMLElement);
+    await userEvent.click(cb('group-conversations-read') as HTMLElement);
     await waitFor(() => expect(cb('users.read')).toBeDisabled());
     expect(cb('users.read')).toHaveAttribute('data-state', 'checked');
 
     // Revoke the source → implied is editable again.
-    await userEvent.click(cb('conversations.read') as HTMLElement);
+    await userEvent.click(cb('group-conversations-read') as HTMLElement);
     await waitFor(() => expect(cb('users.read')).not.toBeDisabled());
   });
 
@@ -271,7 +280,7 @@ describe('RoleDetail — domain grouping, system filter, search, nesting', () =>
 
   it('renders resources grouped under domain headers in the curated order (AC1)', async () => {
     render(<RoleDetail />);
-    await waitFor(() => expect(cb('conversations.read')).not.toBeNull());
+    await waitFor(() => expect(cb('group-conversations-read')).not.toBeNull());
 
     const attendance = screen.getByText('domains.attendance');
     const crm = screen.getByText('domains.crm');
@@ -292,9 +301,76 @@ describe('RoleDetail — domain grouping, system filter, search, nesting', () =>
     expect(screen.queryByText('domains.automation')).toBeNull();
   });
 
+  it('renders one checkbox per action group, and none for the actions inside it', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('group-conversations-read')).not.toBeNull());
+
+    // Two groups + the ungrouped action.
+    expect(cb('group-conversations-write')).not.toBeNull();
+    expect(cb('conversations.delete')).not.toBeNull();
+    // The grouped keys render no row of their own.
+    ['read', 'search', 'attachments', 'create', 'update', 'toggle_status'].forEach(a =>
+      expect(cb(`conversations.${a}`)).toBeNull(),
+    );
+  });
+
+  it('expands a group into its real catalog keys on save', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('group-conversations-write')).not.toBeNull());
+
+    await userEvent.click(cb('group-conversations-write') as HTMLElement);
+    await userEvent.click(screen.getByText('savePermissions'));
+    await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
+
+    const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
+    expect(savedKeys).toEqual(
+      expect.arrayContaining([
+        'conversations.create',
+        'conversations.update',
+        'conversations.toggle_status',
+      ]),
+    );
+    // The other group was never touched.
+    expect(savedKeys).not.toContain('conversations.read');
+  });
+
+  it('shows a partially-granted group as indeterminate and preserves it untouched', async () => {
+    // The role holds one of the three "write" keys.
+    rolePermissions = { conversations: ['update'], labels: ['create'] };
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('group-conversations-write')).not.toBeNull());
+
+    const group = cb('group-conversations-write') as HTMLElement;
+    expect(group).toHaveAttribute('data-indeterminate', 'true');
+    expect(group).toHaveAttribute('data-state', 'unchecked');
+
+    // Saving without touching it must not rewrite the role.
+    await userEvent.click(screen.getByText('savePermissions'));
+    await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
+    const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
+    expect(savedKeys).toContain('conversations.update');
+    expect(savedKeys).not.toContain('conversations.create');
+  });
+
+  it('toggling a fully-granted group off removes every key it stands for', async () => {
+    rolePermissions = { conversations: ['create', 'update', 'toggle_status'], labels: ['create'] };
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('group-conversations-write')).not.toBeNull());
+    expect(cb('group-conversations-write')).toHaveAttribute('data-state', 'checked');
+
+    await userEvent.click(cb('group-conversations-write') as HTMLElement);
+    await userEvent.click(screen.getByText('savePermissions'));
+    await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
+
+    const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
+    ['create', 'update', 'toggle_status'].forEach(a =>
+      expect(savedKeys).not.toContain(`conversations.${a}`),
+    );
+  });
+
   it('never renders a hidden resource, in any domain or under "Others"', async () => {
     render(<RoleDetail />);
-    await waitFor(() => expect(cb('conversations.read')).not.toBeNull());
+    await waitFor(() => expect(cb('group-conversations-read')).not.toBeNull());
 
     ['oauth_applications', 'whatsapp_authorizations', 'ai_folders', 'ai_tools'].forEach(resource => {
       expect(cb(`${resource}.read`)).toBeNull();
@@ -370,12 +446,12 @@ describe('RoleDetail — domain grouping, system filter, search, nesting', () =>
 
   it('filters resources/domains by resource name, action name, or description (AC4)', async () => {
     render(<RoleDetail />);
-    await waitFor(() => expect(cb('conversations.read')).not.toBeNull());
+    await waitFor(() => expect(cb('group-conversations-read')).not.toBeNull());
 
     // "robots" only appears in ai_agents.read's description.
     await userEvent.type(screen.getByPlaceholderText('detail.filterPlaceholder'), 'robots');
 
-    await waitFor(() => expect(cb('conversations.read')).toBeNull());
+    await waitFor(() => expect(cb('group-conversations-read')).toBeNull());
     expect(cb('ai_agents.read')).not.toBeNull();
     // Domains with no surviving resource disappear.
     expect(screen.queryByText('domains.attendance')).toBeNull();

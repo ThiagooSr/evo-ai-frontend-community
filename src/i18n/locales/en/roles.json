@@ -57,6 +57,12 @@
       "impliedBy": "Implied by {{source}}",
       "basicBadge": "Basic",
       "impliedBadge": "Implied"
+    },
+    "actionGroups": {
+      "read": "Read",
+      "readDescription": "Read conversations and their contents: list, search, filter, attachments and transcript.",
+      "write": "Write",
+      "writeDescription": "Write to conversations: create, edit, resolve, prioritise, mute and set custom attributes."
     }
   },
   "createModal": {

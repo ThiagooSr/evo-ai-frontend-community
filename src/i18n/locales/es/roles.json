@@ -57,6 +57,12 @@
       "impliedBy": "Implícita por {{source}}",
       "basicBadge": "Básica",
       "impliedBadge": "Implícita"
+    },
+    "actionGroups": {
+      "read": "Lectura",
+      "readDescription": "Leer conversaciones y su contenido: listar, buscar, filtrar, adjuntos y transcripción.",
+      "write": "Escritura",
+      "writeDescription": "Escribir en conversaciones: crear, editar, resolver, priorizar, silenciar y definir atributos."
     }
   },
   "createModal": {

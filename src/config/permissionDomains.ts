@@ -124,6 +124,68 @@ export const HIDDEN_RESOURCES = new Set<string>([
   'whatsapp_authorizations',
 ]);
 
+// A single checkbox that stands for several catalog keys. The editor renders the
+// group; the save payload expands it back into the real keys, so the backend and
+// the catalog are untouched.
+//
+// This exists because a resource's actions can be far more granular than any
+// decision an admin actually makes. `conversations` declares 21 keys, but there are
+// only five real answers: can you see conversations, can you act on them, can you
+// delete them, can you see every inbox, can you import. The other sixteen either
+// gate nothing at all or gate a route that is a detail of one of those five —
+// `toggle_priority` and the PATCH both set the same field; `search`, `filter` and
+// `attachments` have no permission gate whatsoever (they are scoped by inbox
+// instead); `transcript` gates on `conversations.export`, which is not even a
+// catalog key, so that route 403s for everyone.
+//
+// Collapsing the keys themselves belongs to the backend follow-up. Grouping them in
+// the editor is what the frontend can do today, and it is the part the admin sees.
+export interface ActionGroup {
+  key: string; // suffix for the checkbox id, not a catalog key
+  labelKey: string; // i18n key under the 'roles' locale
+  actions: string[]; // the real catalog keys this checkbox stands for
+}
+
+export const ACTION_GROUPS: Record<string, ActionGroup[]> = {
+  conversations: [
+    {
+      key: 'read',
+      labelKey: 'detail.actionGroups.read',
+      actions: [
+        'read',
+        'meta',
+        'search',
+        'filter',
+        'available_for_pipeline',
+        'attachments',
+        'transcript',
+        'inbox_assistant',
+      ],
+    },
+    {
+      key: 'write',
+      labelKey: 'detail.actionGroups.write',
+      actions: [
+        'create',
+        'update',
+        'toggle_status',
+        'toggle_priority',
+        'custom_attributes',
+        'mute',
+        'unmute',
+        'unread',
+        'update_last_seen',
+        'toggle_typing_status',
+      ],
+    },
+  ],
+};
+
+/** Actions of this resource that render inside a group, not on their own row. */
+export function groupedActionsOf(resourceKey: string): Set<string> {
+  return new Set((ACTION_GROUPS[resourceKey] ?? []).flatMap(g => g.actions));
+}
+
 export interface DomainGroup {
   key: string;
   labelKey: string;

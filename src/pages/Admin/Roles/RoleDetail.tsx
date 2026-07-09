@@ -23,6 +23,8 @@ import { usePermissions } from '@/contexts/PermissionsContext';
 import type { ResourceActionsData } from '@/types/auth/permissions';
 import {
   groupResourcesByDomain,
+  groupedActionsOf,
+  ACTION_GROUPS,
   RESOURCE_NESTING,
   INBOX_TEMPLATE_ACTIONS,
 } from '@/config/permissionDomains';
@@ -113,7 +115,8 @@ export default function RoleDetail() {
       const actions = resourceActions.resources[resource]?.actions ?? {};
       const keys = Object.keys(actions)
         // System actions are never editable and must not leak into the payload
-        // via "select all" (AC3 / NFR1).
+        // via "select all" (AC3 / NFR1). Grouped actions are ordinary grants — the
+        // card's select-all covers them like any other.
         .filter(a => actions[a].system !== true)
         .map(a => `${resource}.${a}`)
         .filter(k => !isKeyLocked(k, prev));
@@ -214,15 +217,69 @@ export default function RoleDetail() {
   };
 
   // Visible action keys for a resource, restricted to `actionKeys`: drop system
-  // actions (AC3), then apply the text filter (AC4). Order is preserved.
+  // actions (AC3) and grouped ones (they render inside their group), then apply the
+  // text filter (AC4). Order is preserved.
   const visibleActionKeys = (resourceKey: string, actionKeys: string[]): string[] => {
     const resourceConfig = resources[resourceKey];
     if (!resourceConfig) return [];
+    const grouped = groupedActionsOf(resourceKey);
     return actionKeys.filter(a => {
       const cfg = resourceConfig.actions[a];
-      if (!cfg || cfg.system === true) return false;
+      if (!cfg || cfg.system === true || grouped.has(a)) return false;
       return passesFilter(resourceConfig.name, cfg.name, cfg.description ?? '');
     });
+  };
+
+  // The real catalog keys a group stands for, restricted to the ones this catalog
+  // actually declares and that are editable (not system, not locked).
+  const groupKeys = (resourceKey: string, actions: string[]): string[] =>
+    actions
+      .filter(a => {
+        const cfg = resources[resourceKey]?.actions?.[a];
+        return cfg !== undefined && cfg.system !== true;
+      })
+      .map(a => `${resourceKey}.${a}`)
+      .filter(k => !isKeyLocked(k, selected));
+
+  // One checkbox, several grants. Toggling on adds every key it stands for; off
+  // removes them. A role that holds only some of them shows indeterminate and keeps
+  // exactly what it has until the admin actually toggles — hiding the granularity
+  // must not silently rewrite a role nobody touched.
+  const toggleGroup = (resourceKey: string, actions: string[]) => {
+    const keys = groupKeys(resourceKey, actions);
+    if (keys.length === 0) return;
+    setSelected(prev => {
+      const next = new Set(prev);
+      const allSelected = keys.every(k => prev.has(k));
+      allSelected ? keys.forEach(k => next.delete(k)) : keys.forEach(k => next.add(k));
+      return next;
+    });
+  };
+
+  const renderGroupRow = (resourceKey: string, group: (typeof ACTION_GROUPS)[string][number]) => {
+    const keys = groupKeys(resourceKey, group.actions);
+    if (keys.length === 0) return null;
+    const id = `group-${resourceKey}-${group.key}`;
+    const allChecked = keys.every(k => selected.has(k));
+    const someChecked = !allChecked && keys.some(k => selected.has(k));
+    return (
+      <div key={id} className="flex items-center gap-2 py-0.5">
+        <Checkbox
+          id={id}
+          checked={allChecked}
+          data-indeterminate={someChecked}
+          onCheckedChange={canEdit ? () => toggleGroup(resourceKey, group.actions) : undefined}
+          disabled={!canEdit}
+        />
+        <Label
+          htmlFor={id}
+          className={`text-sm font-normal text-sidebar-foreground/80 ${canEdit ? 'cursor-pointer' : ''}`}
+        >
+          {t(group.labelKey)}
+        </Label>
+        <TooltipInfo title={t(group.labelKey)} content={t(`${group.labelKey}Description`)} />
+      </div>
+    );
   };
 
   const renderActionRow = (resourceKey: string, actionKey: string) => {
@@ -305,8 +362,21 @@ export default function RoleDetail() {
       .map(child => ({ child, keys: visibleActionKeys(child, Object.keys(resources[child].actions)) }))
       .filter(n => n.keys.length > 0);
 
+    // Grouped rows: one checkbox standing for several keys. Matched by their own
+    // label so the text filter (AC4) reaches them too.
+    const visibleGroups = (ACTION_GROUPS[resourceKey] ?? []).filter(
+      g =>
+        groupKeys(resourceKey, g.actions).length > 0 &&
+        passesFilter(resourceConfig.name, t(g.labelKey), t(`${g.labelKey}Description`)),
+    );
+
     // No visible rows at all (all system, or filtered out) → no card (AC3, AC4).
-    if (visibleRegular.length === 0 && visibleTemplate.length === 0 && visibleNested.length === 0) {
+    if (
+      visibleGroups.length === 0 &&
+      visibleRegular.length === 0 &&
+      visibleTemplate.length === 0 &&
+      visibleNested.length === 0
+    ) {
       return null;
     }
 
@@ -329,6 +399,7 @@ export default function RoleDetail() {
           </div>
         </CardHeader>
         <CardContent className="px-4 py-2 space-y-1">
+          {visibleGroups.map(g => renderGroupRow(resourceKey, g))}
           {visibleRegular.map(a => renderActionRow(resourceKey, a))}
           {visibleTemplate.length > 0 &&
             renderSubBlock('detail.nested.inboxTemplates', resourceKey, visibleTemplate)}
