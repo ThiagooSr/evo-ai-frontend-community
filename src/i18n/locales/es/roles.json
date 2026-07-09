@@ -49,8 +49,7 @@
     "filterPlaceholder": "Buscar permisos...",
     "nested": {
       "pipelineStages": "Etapas",
-      "workingHours": "Horario de atención",
-      "inboxTemplates": "Plantillas"
+      "workingHours": "Horario de atención"
     },
     "lock": {
       "basic": "Concedida a todos los usuarios autenticados",
@@ -60,9 +59,11 @@
     },
     "actionGroups": {
       "read": "Lectura",
-      "readDescription": "Leer conversaciones y su contenido: listar, buscar, filtrar, adjuntos y transcripción.",
+      "readDescription": "Ver este recurso y su contenido.",
       "write": "Escritura",
-      "writeDescription": "Escribir en conversaciones: crear, editar, resolver, priorizar, silenciar y definir atributos."
+      "writeDescription": "Crear y modificar este recurso, incluida toda acción que lo altere.",
+      "delete": "Eliminación",
+      "deleteDescription": "Eliminar este recurso."
     }
   },
   "createModal": {

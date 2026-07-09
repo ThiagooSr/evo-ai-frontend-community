@@ -49,8 +49,7 @@
     "filterPlaceholder": "Search permissions...",
     "nested": {
       "pipelineStages": "Stages",
-      "workingHours": "Working hours",
-      "inboxTemplates": "Templates"
+      "workingHours": "Working hours"
     },
     "lock": {
       "basic": "Granted to every authenticated user",
@@ -60,9 +59,11 @@
     },
     "actionGroups": {
       "read": "Read",
-      "readDescription": "Read conversations and their contents: list, search, filter, attachments and transcript.",
+      "readDescription": "See this resource and its contents.",
       "write": "Write",
-      "writeDescription": "Write to conversations: create, edit, resolve, prioritise, mute and set custom attributes."
+      "writeDescription": "Create and change this resource, including every action that modifies it.",
+      "delete": "Delete",
+      "deleteDescription": "Delete this resource."
     }
   },
   "createModal": {

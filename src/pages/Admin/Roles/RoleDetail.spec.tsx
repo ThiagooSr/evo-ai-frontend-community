@@ -62,8 +62,9 @@ vi.mock('@/services/permissions', () => ({
               create: { name: 'Create', description: '', basic: false, implied_by: null },
               update: { name: 'Update', description: '', basic: false, implied_by: null },
               toggle_status: { name: 'Toggle status', description: '', basic: false, implied_by: null },
-              // ungrouped — renders its own row
               delete: { name: 'Delete', description: '', basic: false, implied_by: null },
+              // standalone: scope, not CRUD — keeps its own row
+              read_all: { name: 'Read all', description: '', basic: false, implied_by: null },
             },
           },
           labels: {
@@ -80,6 +81,7 @@ vi.mock('@/services/permissions', () => ({
             description: '',
             actions: {
               read: { name: 'View', description: '', basic: false, implied_by: 'conversations.read' },
+              stats: { name: 'Statistics', description: '', basic: false, implied_by: null },
             },
           },
           // CRM domain, with a nested child (pipeline_stages under pipelines).
@@ -95,6 +97,7 @@ vi.mock('@/services/permissions', () => ({
             description: '',
             actions: {
               read: { name: 'View', description: '', basic: false, implied_by: null },
+              create: { name: 'Create', description: '', basic: false, implied_by: null },
             },
           },
           // Channels domain: nested child (working_hours) + an inbox template action.
@@ -103,7 +106,10 @@ vi.mock('@/services/permissions', () => ({
             description: '',
             actions: {
               read: { name: 'View', description: '', basic: false, implied_by: null },
-              message_templates: { name: 'List templates', description: '', basic: false, implied_by: null },
+              // Live: gates the per-channel Meta sync → a write.
+              message_templates: { name: 'Sync templates', description: '', basic: false, implied_by: null },
+              // Dead since EVO-1716 → hidden.
+              delete_message_template: { name: 'Delete template', description: '', basic: false, implied_by: null },
             },
           },
           working_hours: {
@@ -111,6 +117,7 @@ vi.mock('@/services/permissions', () => ({
             description: '',
             actions: {
               read: { name: 'View', description: '', basic: false, implied_by: null },
+              update: { name: 'Update', description: '', basic: false, implied_by: null },
             },
           },
           // AI domain: a normal action next to a system action (leak guard).
@@ -197,121 +204,88 @@ beforeEach(() => {
 const cb = (key: string) => document.getElementById(key) as HTMLButtonElement | null;
 
 describe('RoleDetail — locked basic/implied permissions', () => {
-  it('locks basic always, but leaves an implied permission editable when its source is not held', async () => {
-    // Role holds labels.create only (no conversations.read).
+  // A locked permission is held regardless of the role, so the editor offers no
+  // decision about it: no row, no checkbox, and it never reaches the payload.
+  it('renders no row for a basic permission, and never persists it', async () => {
     render(<RoleDetail />);
-    await waitFor(() => expect(cb('labels.read')).not.toBeNull());
+    await waitFor(() => expect(cb('group-labels-write')).not.toBeNull());
 
-    // Basic: checked despite the role not granting it, and not editable.
-    expect(cb('labels.read')).toBeDisabled();
-    expect(cb('labels.read')).toHaveAttribute('data-state', 'checked');
-
-    // Implied by a grant this role does NOT hold → a normal, editable checkbox
-    // reflecting its real (ungranted) state.
-    expect(cb('users.read')).not.toBeDisabled();
-    expect(cb('users.read')).toHaveAttribute('data-state', 'unchecked');
-
-    // A genuinely managed permission stays editable.
-    expect(cb('labels.create')).not.toBeDisabled();
-  });
-
-  it('locks/unlocks the implied permission reactively as its source is toggled', async () => {
-    render(<RoleDetail />);
-    await waitFor(() => expect(cb('users.read')).not.toBeNull());
-
-    // Source absent → implied editable.
-    expect(cb('users.read')).not.toBeDisabled();
-
-    // Grant the source → implied becomes locked + checked.
-    await userEvent.click(cb('group-conversations-read') as HTMLElement);
-    await waitFor(() => expect(cb('users.read')).toBeDisabled());
-    expect(cb('users.read')).toHaveAttribute('data-state', 'checked');
-
-    // Revoke the source → implied is editable again.
-    await userEvent.click(cb('group-conversations-read') as HTMLElement);
-    await waitFor(() => expect(cb('users.read')).not.toBeDisabled());
-  });
-
-  it('excludes an implied permission from the payload while its source is held', async () => {
-    // Role holds the source grant, so users.read is locked (backend-derived).
-    rolePermissions = { conversations: ['read'], labels: ['create'] };
-    render(<RoleDetail />);
-    await waitFor(() => expect(cb('users.read')).not.toBeNull());
-
-    expect(cb('users.read')).toBeDisabled();
-    expect(cb('users.read')).toHaveAttribute('data-state', 'checked');
+    // labels.read is basic → nothing to grant, so the Read group has no editable
+    // key and does not render at all.
+    expect(cb('labels.read')).toBeNull();
+    expect(cb('group-labels-read')).toBeNull();
+    // The role already holds labels.create, so the Write group is checked.
+    expect(cb('group-labels-write')).toHaveAttribute('data-state', 'checked');
 
     await userEvent.click(screen.getByText('savePermissions'));
-
     await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
     const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
-    expect(savedKeys).toContain('conversations.read');
     expect(savedKeys).toContain('labels.create');
-    // Locked (implied + basic) keys are never persisted as role grants.
-    expect(savedKeys).not.toContain('users.read');
     expect(savedKeys).not.toContain('labels.read');
   });
 
-  it('persists an implied permission when checked without its source held', async () => {
+  it('keeps an implied permission editable inside its group while its source is not held', async () => {
     render(<RoleDetail />);
-    await waitFor(() => expect(cb('users.read')).not.toBeNull());
+    await waitFor(() => expect(cb('group-users-read')).not.toBeNull());
 
-    // Source absent → the implied checkbox is a real grant the user can set.
-    await userEvent.click(cb('users.read') as HTMLElement);
-    expect(cb('users.read')).toHaveAttribute('data-state', 'checked');
-
+    // users.read is implied by conversations.read, which this role does not hold —
+    // so it is a genuine, grantable permission and lives in the Read group.
+    await userEvent.click(cb('group-users-read') as HTMLElement);
     await userEvent.click(screen.getByText('savePermissions'));
-
     await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
     const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
     expect(savedKeys).toContain('users.read');
-    expect(savedKeys).toContain('labels.create');
-    expect(savedKeys).not.toContain('labels.read');
+  });
+
+  it('drops the implied permission from the payload once its source is held', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('group-conversations-read')).not.toBeNull());
+
+    await userEvent.click(cb('group-conversations-read') as HTMLElement);
+    await userEvent.click(screen.getByText('savePermissions'));
+    await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
+
+    const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
+    expect(savedKeys).toContain('conversations.read');
+    expect(savedKeys).not.toContain('users.read');
+  });
+
+  it('the Read group ignores a locked member when toggled', async () => {
+    // Holding conversations.read locks users.read; toggling the users Read group
+    // must still grant the keys that are actually editable.
+    rolePermissions = { conversations: ['read'], labels: ['create'] };
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('group-users-read')).not.toBeNull());
+
+    await userEvent.click(cb('group-users-read') as HTMLElement);
+    await userEvent.click(screen.getByText('savePermissions'));
+    await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
+    const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
+    expect(savedKeys).toContain('users.stats');
+    expect(savedKeys).not.toContain('users.read');
   });
 });
 
-// EVO-2071: presentation-only regrouping of the role editor by domain, with a
-// future-proof "Others" fallback, hidden system actions, a text filter, and
-// visual nesting. No enforcement/lock behaviour changes (covered above).
-describe('RoleDetail — domain grouping, system filter, search, nesting', () => {
-  // In the DOM, does `a` come before `b`?
-  const precedes = (a: Element, b: Element) =>
-    Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
-
-  it('renders resources grouped under domain headers in the curated order (AC1)', async () => {
+// EVO-2069: every resource collapses to Read / Write / Delete. The group is one
+// checkbox; the save payload still carries the individual catalog keys.
+describe('RoleDetail — action groups', () => {
+  it('renders one checkbox per group, and none for the actions inside it', async () => {
     render(<RoleDetail />);
     await waitFor(() => expect(cb('group-conversations-read')).not.toBeNull());
 
-    const attendance = screen.getByText('domains.attendance');
-    const crm = screen.getByText('domains.crm');
-    const ai = screen.getByText('domains.ai');
-    const channels = screen.getByText('domains.channels');
-    const admin = screen.getByText('domains.admin');
-    const others = screen.getByText('domains.others');
-
-    // Curated order: attendance → crm → ai → channels → admin → others.
-    expect(precedes(attendance, crm)).toBe(true);
-    expect(precedes(crm, ai)).toBe(true);
-    expect(precedes(ai, channels)).toBe(true);
-    expect(precedes(channels, admin)).toBe(true);
-    expect(precedes(admin, others)).toBe(true);
-
-    // Empty domains (no present resource) never render a header.
-    expect(screen.queryByText('domains.contacts')).toBeNull();
-    expect(screen.queryByText('domains.automation')).toBeNull();
-  });
-
-  it('renders one checkbox per action group, and none for the actions inside it', async () => {
-    render(<RoleDetail />);
-    await waitFor(() => expect(cb('group-conversations-read')).not.toBeNull());
-
-    // Two groups + the ungrouped action.
     expect(cb('group-conversations-write')).not.toBeNull();
-    expect(cb('conversations.delete')).not.toBeNull();
-    // The grouped keys render no row of their own.
-    ['read', 'search', 'attachments', 'create', 'update', 'toggle_status'].forEach(a =>
+    expect(cb('group-conversations-delete')).not.toBeNull();
+    ['read', 'search', 'attachments', 'create', 'update', 'toggle_status', 'delete'].forEach(a =>
       expect(cb(`conversations.${a}`)).toBeNull(),
     );
+  });
+
+  it('keeps a standalone action on its own row', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('group-conversations-read')).not.toBeNull());
+
+    // read_all is scope, not CRUD.
+    expect(cb('conversations.read_all')).not.toBeNull();
   });
 
   it('expands a group into its real catalog keys on save', async () => {
@@ -330,12 +304,11 @@ describe('RoleDetail — domain grouping, system filter, search, nesting', () =>
         'conversations.toggle_status',
       ]),
     );
-    // The other group was never touched.
     expect(savedKeys).not.toContain('conversations.read');
+    expect(savedKeys).not.toContain('conversations.delete');
   });
 
   it('shows a partially-granted group as indeterminate and preserves it untouched', async () => {
-    // The role holds one of the three "write" keys.
     rolePermissions = { conversations: ['update'], labels: ['create'] };
     render(<RoleDetail />);
     await waitFor(() => expect(cb('group-conversations-write')).not.toBeNull());
@@ -344,7 +317,6 @@ describe('RoleDetail — domain grouping, system filter, search, nesting', () =>
     expect(group).toHaveAttribute('data-indeterminate', 'true');
     expect(group).toHaveAttribute('data-state', 'unchecked');
 
-    // Saving without touching it must not rewrite the role.
     await userEvent.click(screen.getByText('savePermissions'));
     await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
     const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
@@ -353,7 +325,11 @@ describe('RoleDetail — domain grouping, system filter, search, nesting', () =>
   });
 
   it('toggling a fully-granted group off removes every key it stands for', async () => {
-    rolePermissions = { conversations: ['create', 'update', 'toggle_status'], labels: ['create'] };
+    rolePermissions = {
+      conversations: ['create', 'update', 'toggle_status', 'mute', 'unmute', 'toggle_priority',
+        'custom_attributes', 'toggle_typing_status', 'update_last_seen', 'unread', 'import'],
+      labels: ['create'],
+    };
     render(<RoleDetail />);
     await waitFor(() => expect(cb('group-conversations-write')).not.toBeNull());
     expect(cb('group-conversations-write')).toHaveAttribute('data-state', 'checked');
@@ -368,24 +344,72 @@ describe('RoleDetail — domain grouping, system filter, search, nesting', () =>
     );
   });
 
+  it('hides a dead action and does not revoke a grant the role already holds for it', async () => {
+    rolePermissions = { inboxes: ['delete_message_template', 'read'], labels: ['create'] };
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('group-inboxes-read')).not.toBeNull());
+
+    expect(cb('inboxes.delete_message_template')).toBeNull();
+
+    await userEvent.click(screen.getByText('savePermissions'));
+    await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
+    const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
+    expect(savedKeys).toContain('inboxes.delete_message_template');
+  });
+
+  it('classifies the live inbox template sync as a write, not a read', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('group-inboxes-write')).not.toBeNull());
+
+    await userEvent.click(cb('group-inboxes-write') as HTMLElement);
+    await userEvent.click(screen.getByText('savePermissions'));
+    await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
+    const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
+    expect(savedKeys).toContain('inboxes.message_templates');
+  });
+});
+
+describe('RoleDetail — domain grouping, system filter, search, nesting', () => {
+  const precedes = (a: Element, b: Element) =>
+    Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it('renders resources grouped under domain headers in the curated order (AC1)', async () => {
+    render(<RoleDetail />);
+    await waitFor(() => expect(cb('group-conversations-read')).not.toBeNull());
+
+    const attendance = screen.getByText('domains.attendance');
+    const crm = screen.getByText('domains.crm');
+    const ai = screen.getByText('domains.ai');
+    const channels = screen.getByText('domains.channels');
+    const admin = screen.getByText('domains.admin');
+    const others = screen.getByText('domains.others');
+
+    expect(precedes(attendance, crm)).toBe(true);
+    expect(precedes(crm, ai)).toBe(true);
+    expect(precedes(ai, channels)).toBe(true);
+    expect(precedes(channels, admin)).toBe(true);
+    expect(precedes(admin, others)).toBe(true);
+
+    expect(screen.queryByText('domains.contacts')).toBeNull();
+    expect(screen.queryByText('domains.automation')).toBeNull();
+  });
+
   it('never renders a hidden resource, in any domain or under "Others"', async () => {
     render(<RoleDetail />);
     await waitFor(() => expect(cb('group-conversations-read')).not.toBeNull());
 
     ['oauth_applications', 'whatsapp_authorizations', 'ai_folders', 'ai_tools'].forEach(resource => {
-      expect(cb(`${resource}.read`)).toBeNull();
+      expect(cb(`group-${resource}-read`)).toBeNull();
       expect(cb(`resource-${resource}`)).toBeNull();
     });
     expect(screen.queryByText('OAuth Applications')).toBeNull();
-    expect(screen.queryByText('WhatsApp Authorizations')).toBeNull();
     expect(screen.queryByText('AI Folders')).toBeNull();
   });
 
   it('hiding a resource does not revoke a grant the role already holds', async () => {
     rolePermissions = { oauth_applications: ['read'], labels: ['create'] };
     render(<RoleDetail />);
-    await waitFor(() => expect(cb('labels.create')).not.toBeNull());
-    expect(cb('oauth_applications.read')).toBeNull();
+    await waitFor(() => expect(cb('group-labels-write')).not.toBeNull());
 
     await userEvent.click(screen.getByText('savePermissions'));
     await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
@@ -393,14 +417,11 @@ describe('RoleDetail — domain grouping, system filter, search, nesting', () =>
     expect(savedKeys).toContain('oauth_applications.read');
   });
 
-  // Regression: bulk_update_permissions replaces the whole set, so omitting a held
-  // system key deletes it. ai_agent_processor.execute gates the chat WebSocket.
   it('re-sends system grants the role already holds instead of stripping them', async () => {
     rolePermissions = { ai_agents: ['read', 'secret_sync'], labels: ['create'] };
     render(<RoleDetail />);
-    await waitFor(() => expect(cb('ai_agents.read')).not.toBeNull());
+    await waitFor(() => expect(cb('group-ai_agents-read')).not.toBeNull());
 
-    // Still no checkbox for it — hidden, but not forgotten.
     expect(cb('ai_agents.secret_sync')).toBeNull();
 
     await userEvent.click(screen.getByText('savePermissions'));
@@ -412,31 +433,26 @@ describe('RoleDetail — domain grouping, system filter, search, nesting', () =>
 
   it('places a catalog resource outside every domain under "Others" (NFR4/AC2)', async () => {
     render(<RoleDetail />);
-    await waitFor(() => expect(cb('zzz_new_feature.read')).not.toBeNull());
+    await waitFor(() => expect(cb('group-zzz_new_feature-read')).not.toBeNull());
     expect(screen.getByText('domains.others')).toBeTruthy();
-    // The fake resource is claimed by "Others", after every real domain.
     expect(precedes(screen.getByText('domains.admin'), screen.getByText('domains.others'))).toBe(true);
   });
 
   it('hides system actions and drops a fully-system resource card (AC3)', async () => {
     render(<RoleDetail />);
-    await waitFor(() => expect(cb('ai_agents.read')).not.toBeNull());
+    await waitFor(() => expect(cb('group-ai_agents-read')).not.toBeNull());
 
-    // System action → no checkbox at all.
     expect(cb('ai_agents.secret_sync')).toBeNull();
-    // Resource with only system actions → no card (no rows, no select-all).
     expect(cb('installation_configs.manage')).toBeNull();
     expect(cb('resource-installation_configs')).toBeNull();
+    expect(cb('group-installation_configs-write')).toBeNull();
   });
 
   it('never leaks a system key into the payload via the card select-all (AC3/NFR1)', async () => {
     render(<RoleDetail />);
     await waitFor(() => expect(cb('resource-ai_agents')).not.toBeNull());
 
-    // "Select all" on a card that mixes a normal + a system action.
     await userEvent.click(cb('resource-ai_agents') as HTMLElement);
-    expect(cb('ai_agents.read')).toHaveAttribute('data-state', 'checked');
-
     await userEvent.click(screen.getByText('savePermissions'));
     await waitFor(() => expect(bulkUpdateMock).toHaveBeenCalled());
     const savedKeys = bulkUpdateMock.mock.calls[0][1] as string[];
@@ -444,36 +460,29 @@ describe('RoleDetail — domain grouping, system filter, search, nesting', () =>
     expect(savedKeys).not.toContain('ai_agents.secret_sync');
   });
 
-  it('filters resources/domains by resource name, action name, or description (AC4)', async () => {
+  it('filters resources/domains by resource name or group label (AC4)', async () => {
     render(<RoleDetail />);
     await waitFor(() => expect(cb('group-conversations-read')).not.toBeNull());
 
-    // "robots" only appears in ai_agents.read's description.
-    await userEvent.type(screen.getByPlaceholderText('detail.filterPlaceholder'), 'robots');
+    await userEvent.type(screen.getByPlaceholderText('detail.filterPlaceholder'), 'Pipelines');
 
     await waitFor(() => expect(cb('group-conversations-read')).toBeNull());
-    expect(cb('ai_agents.read')).not.toBeNull();
-    // Domains with no surviving resource disappear.
+    expect(cb('group-pipelines-read')).not.toBeNull();
     expect(screen.queryByText('domains.attendance')).toBeNull();
-    expect(screen.getByText('domains.ai')).toBeTruthy();
+    expect(screen.getByText('domains.crm')).toBeTruthy();
   });
 
   it('nests pipeline_stages and working_hours inside their parent cards (AC6)', async () => {
     render(<RoleDetail />);
-    await waitFor(() => expect(cb('pipelines.read')).not.toBeNull());
+    await waitFor(() => expect(cb('group-pipelines-read')).not.toBeNull());
 
-    // Nested action rows render (keys unchanged)...
-    expect(cb('pipeline_stages.read')).not.toBeNull();
-    expect(cb('working_hours.read')).not.toBeNull();
-    // ...but never as their own resource card (no card-level select-all).
+    // The nested child renders its own groups, never its own card.
+    expect(cb('group-pipeline_stages-read')).not.toBeNull();
+    expect(cb('group-working_hours-read')).not.toBeNull();
     expect(cb('resource-pipeline_stages')).toBeNull();
     expect(cb('resource-working_hours')).toBeNull();
 
-    // Sub-labels for the nested blocks and inbox templates are present.
     expect(screen.getByText('detail.nested.pipelineStages')).toBeTruthy();
     expect(screen.getByText('detail.nested.workingHours')).toBeTruthy();
-    expect(screen.getByText('detail.nested.inboxTemplates')).toBeTruthy();
-    // The inbox template action is grouped, still keyed under inboxes.*.
-    expect(cb('inboxes.message_templates')).not.toBeNull();
   });
 });

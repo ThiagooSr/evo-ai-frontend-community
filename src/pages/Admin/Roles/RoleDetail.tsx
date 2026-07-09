@@ -23,10 +23,11 @@ import { usePermissions } from '@/contexts/PermissionsContext';
 import type { ResourceActionsData } from '@/types/auth/permissions';
 import {
   groupResourcesByDomain,
-  groupedActionsOf,
-  ACTION_GROUPS,
+  groupsFor,
+  isHiddenAction,
+  isStandaloneAction,
+  type ActionGroup,
   RESOURCE_NESTING,
-  INBOX_TEMPLATE_ACTIONS,
 } from '@/config/permissionDomains';
 
 // Nested resource -> i18n key for its sub-label inside the parent card (AC6).
@@ -114,10 +115,10 @@ export default function RoleDetail() {
     setSelected(prev => {
       const actions = resourceActions.resources[resource]?.actions ?? {};
       const keys = Object.keys(actions)
-        // System actions are never editable and must not leak into the payload
-        // via "select all" (AC3 / NFR1). Grouped actions are ordinary grants — the
-        // card's select-all covers them like any other.
-        .filter(a => actions[a].system !== true)
+        // System actions are never editable and must not leak into the payload via
+        // "select all" (AC3 / NFR1); hidden ones render nothing either. Grouped
+        // actions are ordinary grants — select-all covers them like any other.
+        .filter(a => actions[a].system !== true && !isHiddenAction(resource, a))
         .map(a => `${resource}.${a}`)
         .filter(k => !isKeyLocked(k, prev));
       const allSelected = keys.length > 0 && keys.every(k => prev.has(k));
@@ -222,10 +223,16 @@ export default function RoleDetail() {
   const visibleActionKeys = (resourceKey: string, actionKeys: string[]): string[] => {
     const resourceConfig = resources[resourceKey];
     if (!resourceConfig) return [];
-    const grouped = groupedActionsOf(resourceKey);
     return actionKeys.filter(a => {
       const cfg = resourceConfig.actions[a];
-      if (!cfg || cfg.system === true || grouped.has(a)) return false;
+      if (!cfg || cfg.system === true || isHiddenAction(resourceKey, a)) return false;
+      // Only standalone actions keep a row of their own. Everything else lives in a
+      // group. Locked actions (basic, or implied by a grant this role holds) render
+      // nothing at all: the role holds them regardless, so there is no decision to
+      // offer — `groupKeys` drops them from the group and `handleSave` never sends
+      // them. Giving them a row would put a second, unactionable "View" next to the
+      // Read group that already covers them.
+      if (!isStandaloneAction(resourceKey, a)) return false;
       return passesFilter(resourceConfig.name, cfg.name, cfg.description ?? '');
     });
   };
@@ -256,7 +263,7 @@ export default function RoleDetail() {
     });
   };
 
-  const renderGroupRow = (resourceKey: string, group: (typeof ACTION_GROUPS)[string][number]) => {
+  const renderGroupRow = (resourceKey: string, group: ActionGroup) => {
     const keys = groupKeys(resourceKey, group.actions);
     if (keys.length === 0) return null;
     const id = `group-${resourceKey}-${group.key}`;
@@ -281,6 +288,18 @@ export default function RoleDetail() {
       </div>
     );
   };
+
+  // Groups of a resource that survive the text filter and still have editable keys.
+  const visibleGroupsFor = (resourceKey: string, actionKeys: string[]): ActionGroup[] =>
+    groupsFor(resourceKey, actionKeys).filter(
+      g =>
+        groupKeys(resourceKey, g.actions).length > 0 &&
+        passesFilter(
+          resources[resourceKey]?.name ?? '',
+          t(g.labelKey),
+          t(`${g.labelKey}Description`),
+        ),
+    );
 
   const renderActionRow = (resourceKey: string, actionKey: string) => {
     const actionConfig = resources[resourceKey].actions[actionKey];
@@ -321,10 +340,10 @@ export default function RoleDetail() {
 
   // A sub-block: a translated label followed by a set of action rows (used for
   // inbox templates and nested child resources — AC6).
-  const renderSubBlock = (labelKey: string, resourceKey: string, actionKeys: string[]) => (
+  const renderSubBlock = (labelKey: string, resourceKey: string, rows: React.ReactNode) => (
     <div key={`${resourceKey}:${labelKey}`} className="pt-1">
       <p className="text-xs font-medium text-sidebar-foreground/50 pt-1">{t(labelKey)}</p>
-      {actionKeys.map(a => renderActionRow(resourceKey, a))}
+      {rows}
     </div>
   );
 
@@ -344,39 +363,30 @@ export default function RoleDetail() {
     const allChecked = manageableKeys.length > 0 && manageableKeys.every(k => selected.has(k));
     const someChecked = manageableKeys.some(k => selected.has(k));
 
-    // Inbox template actions get their own sub-label inside the inboxes card (AC6).
-    const isInbox = resourceKey === 'inboxes';
-    const templateSet = new Set(INBOX_TEMPLATE_ACTIONS);
-    const regularKeys = isInbox ? nonSystemKeys.filter(a => !templateSet.has(a)) : nonSystemKeys;
-    const templateKeys = isInbox ? nonSystemKeys.filter(a => templateSet.has(a)) : [];
-
     // Child resources nested inside this card (pipeline_stages, working_hours).
     const nestedChildren = Object.entries(RESOURCE_NESTING)
       .filter(([, parent]) => parent === resourceKey)
       .map(([child]) => child)
       .filter(child => resources[child]);
 
-    const visibleRegular = visibleActionKeys(resourceKey, regularKeys);
-    const visibleTemplate = visibleActionKeys(resourceKey, templateKeys);
+    // One checkbox per group; standalone actions keep their own row.
+    const ownActions = Object.keys(resourceConfig.actions);
+    const visibleGroups = visibleGroupsFor(resourceKey, ownActions);
+    const visibleStandalone = visibleActionKeys(resourceKey, ownActions);
+
     const visibleNested = nestedChildren
-      .map(child => ({ child, keys: visibleActionKeys(child, Object.keys(resources[child].actions)) }))
-      .filter(n => n.keys.length > 0);
+      .map(child => {
+        const childActions = Object.keys(resources[child].actions);
+        return {
+          child,
+          groups: visibleGroupsFor(child, childActions),
+          standalone: visibleActionKeys(child, childActions),
+        };
+      })
+      .filter(n => n.groups.length > 0 || n.standalone.length > 0);
 
-    // Grouped rows: one checkbox standing for several keys. Matched by their own
-    // label so the text filter (AC4) reaches them too.
-    const visibleGroups = (ACTION_GROUPS[resourceKey] ?? []).filter(
-      g =>
-        groupKeys(resourceKey, g.actions).length > 0 &&
-        passesFilter(resourceConfig.name, t(g.labelKey), t(`${g.labelKey}Description`)),
-    );
-
-    // No visible rows at all (all system, or filtered out) → no card (AC3, AC4).
-    if (
-      visibleGroups.length === 0 &&
-      visibleRegular.length === 0 &&
-      visibleTemplate.length === 0 &&
-      visibleNested.length === 0
-    ) {
+    // No visible rows at all (all system/hidden, or filtered out) → no card.
+    if (visibleGroups.length === 0 && visibleStandalone.length === 0 && visibleNested.length === 0) {
       return null;
     }
 
@@ -400,11 +410,16 @@ export default function RoleDetail() {
         </CardHeader>
         <CardContent className="px-4 py-2 space-y-1">
           {visibleGroups.map(g => renderGroupRow(resourceKey, g))}
-          {visibleRegular.map(a => renderActionRow(resourceKey, a))}
-          {visibleTemplate.length > 0 &&
-            renderSubBlock('detail.nested.inboxTemplates', resourceKey, visibleTemplate)}
-          {visibleNested.map(({ child, keys }) =>
-            renderSubBlock(NESTED_LABEL_KEYS[child], child, keys),
+          {visibleStandalone.map(a => renderActionRow(resourceKey, a))}
+          {visibleNested.map(({ child, groups, standalone }) =>
+            renderSubBlock(
+              NESTED_LABEL_KEYS[child],
+              child,
+              <>
+                {groups.map(g => renderGroupRow(child, g))}
+                {standalone.map(a => renderActionRow(child, a))}
+              </>,
+            ),
           )}
         </CardContent>
       </Card>

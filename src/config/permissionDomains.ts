@@ -67,17 +67,6 @@ export const RESOURCE_NESTING: Record<string, string> = {
   working_hours: 'inboxes',
 };
 
-// Inbox actions grouped under a "Templates" sub-label inside the inboxes card (AC6).
-export const INBOX_TEMPLATE_ACTIONS: string[] = [
-  'sync_whatsapp_templates',
-  'whatsapp_templates',
-  'update_whatsapp_template',
-  'delete_whatsapp_template',
-  'message_templates',
-  'update_message_template',
-  'delete_message_template',
-];
-
 // Resources the role editor must not offer, because there is nothing for an admin
 // to grant. They stay in the auth catalog — services still enforce some of them, and
 // dropping a key would 403 those routes — but no user administers them here. They are
@@ -124,66 +113,104 @@ export const HIDDEN_RESOURCES = new Set<string>([
   'whatsapp_authorizations',
 ]);
 
-// A single checkbox that stands for several catalog keys. The editor renders the
-// group; the save payload expands it back into the real keys, so the backend and
-// the catalog are untouched.
+// Actions the role editor must not offer, keyed by resource. The key exists in the
+// catalog but gates nothing, so a checkbox for it can only mislead.
 //
-// This exists because a resource's actions can be far more granular than any
-// decision an admin actually makes. `conversations` declares 21 keys, but there are
-// only five real answers: can you see conversations, can you act on them, can you
-// delete them, can you see every inbox, can you import. The other sixteen either
-// gate nothing at all or gate a route that is a detail of one of those five —
-// `toggle_priority` and the PATCH both set the same field; `search`, `filter` and
-// `attachments` have no permission gate whatsoever (they are scoped by inbox
-// instead); `transcript` gates on `conversations.export`, which is not even a
-// catalog key, so that route 403s for everyone.
+// inboxes: EVO-1716 moved template CRUD out of InboxesController into its own
+// `message_templates` resource. Six of the seven inbox template keys went dead with
+// it — they survive only as InboxPolicy methods no controller calls, and no route
+// reaches them. The seventh, `message_templates`, still gates the per-channel Meta
+// sync, so it stays (as a write).
+export const HIDDEN_ACTIONS: Record<string, Set<string>> = {
+  inboxes: new Set([
+    'whatsapp_templates',
+    'sync_whatsapp_templates',
+    'update_whatsapp_template',
+    'delete_whatsapp_template',
+    'update_message_template',
+    'delete_message_template',
+  ]),
+};
+
+export function isHiddenAction(resourceKey: string, actionKey: string): boolean {
+  return HIDDEN_ACTIONS[resourceKey]?.has(actionKey) ?? false;
+}
+
+// One checkbox standing for several catalog keys. The editor renders the group; the
+// save payload expands it back into the real keys, so the backend and the catalog
+// are untouched.
 //
-// Collapsing the keys themselves belongs to the backend follow-up. Grouping them in
-// the editor is what the frontend can do today, and it is the part the admin sees.
+// A resource's actions are far more granular than any decision an admin makes.
+// There are three: can you read it, can you write to it, can you delete it. Every
+// mutating verb — clone, duplicate, toggle_active, pause/resume/stop, execute,
+// recompute, connect/disconnect, sync, test — is a write. Deleting something *inside*
+// the resource (a custom attribute, an access token, an avatar) is a write too;
+// "delete" means deleting the resource itself.
+//
+// Collapsing the keys is a backend change. Grouping them here is the part the admin
+// sees.
 export interface ActionGroup {
-  key: string; // suffix for the checkbox id, not a catalog key
-  labelKey: string; // i18n key under the 'roles' locale
+  key: 'read' | 'write' | 'delete';
+  labelKey: string;
   actions: string[]; // the real catalog keys this checkbox stands for
 }
 
-export const ACTION_GROUPS: Record<string, ActionGroup[]> = {
-  conversations: [
-    {
-      key: 'read',
-      labelKey: 'detail.actionGroups.read',
-      actions: [
-        'read',
-        'meta',
-        'search',
-        'filter',
-        'available_for_pipeline',
-        'attachments',
-        'transcript',
-        'inbox_assistant',
-      ],
-    },
-    {
-      key: 'write',
-      labelKey: 'detail.actionGroups.write',
-      actions: [
-        'create',
-        'update',
-        'toggle_status',
-        'toggle_priority',
-        'custom_attributes',
-        'mute',
-        'unmute',
-        'unread',
-        'update_last_seen',
-        'toggle_typing_status',
-      ],
-    },
-  ],
+// Reads. Everything else that is not a delete or a standalone is a write.
+const READ_ACTIONS = new Set([
+  'read',
+  'meta',
+  'search',
+  'filter',
+  'available_for_pipeline',
+  'attachments',
+  'transcript',
+  'inbox_assistant',
+  'active',
+  'contactable_inboxes',
+  'assignable_agents',
+  'agent_bot',
+  'stats',
+  'types',
+  'permissions',
+  'check_permission',
+  'export',
+]);
+
+// Keys that are not CRUD at all and keep their own row.
+//   conversations.read_all  scope, not reading: see every inbox
+//   users.manage            still being defined; left alone on purpose
+const STANDALONE_ACTIONS: Record<string, Set<string>> = {
+  conversations: new Set(['read_all']),
+  users: new Set(['manage']),
 };
 
+export function isStandaloneAction(resourceKey: string, actionKey: string): boolean {
+  return STANDALONE_ACTIONS[resourceKey]?.has(actionKey) ?? false;
+}
+
+/** Which group an action belongs to, or null when it renders on its own row. */
+export function groupOfAction(resourceKey: string, actionKey: string): ActionGroup['key'] | null {
+  if (isHiddenAction(resourceKey, actionKey)) return null;
+  if (isStandaloneAction(resourceKey, actionKey)) return null;
+  if (actionKey === 'delete') return 'delete';
+  return READ_ACTIONS.has(actionKey) ? 'read' : 'write';
+}
+
+const GROUP_ORDER: ActionGroup['key'][] = ['read', 'write', 'delete'];
+
+/** The groups this resource renders, given the actions it actually declares. */
+export function groupsFor(resourceKey: string, actionKeys: string[]): ActionGroup[] {
+  return GROUP_ORDER.flatMap(key => {
+    const actions = actionKeys.filter(a => groupOfAction(resourceKey, a) === key);
+    return actions.length > 0
+      ? [{ key, labelKey: `detail.actionGroups.${key}`, actions } as ActionGroup]
+      : [];
+  });
+}
+
 /** Actions of this resource that render inside a group, not on their own row. */
-export function groupedActionsOf(resourceKey: string): Set<string> {
-  return new Set((ACTION_GROUPS[resourceKey] ?? []).flatMap(g => g.actions));
+export function groupedActionsOf(resourceKey: string, actionKeys: string[]): Set<string> {
+  return new Set(actionKeys.filter(a => groupOfAction(resourceKey, a) !== null));
 }
 
 export interface DomainGroup {
