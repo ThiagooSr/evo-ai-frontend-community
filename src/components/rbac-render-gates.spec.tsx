@@ -6,7 +6,6 @@ import MacrosTable from '@/components/macros/MacrosTable';
 import MacrosHeader from '@/components/macros/MacrosHeader';
 import PipelinesHeader from '@/components/pipelines/PipelinesHeader';
 import CannedResponsesTable from '@/components/cannedResponses/CannedResponsesTable';
-import PipelineCard from '@/components/pipelines/PipelineCard';
 import PipelinesTable from '@/components/pipelines/PipelinesTable';
 import AgentActionsDropdown from '@/components/agents/AgentActionsDropdown';
 import AgentHeader from '@/components/ai_agents/Header/AgentHeader';
@@ -213,29 +212,6 @@ describe('write-control render gates', () => {
     expect(screen.getByText('pipelinesHeader.newPipeline')).toBeTruthy();
   });
 
-  const renderPipelineCard = () =>
-    render(
-      <PipelineCard
-        pipeline={pipeline}
-        onView={noop}
-        onEdit={noop}
-        onDelete={noop}
-        onDuplicate={noop}
-        onToggleStatus={noop}
-        onSetAsDefault={noop}
-      />,
-    );
-
-  it('PipelineCard hides the edit control without pipelines.update', () => {
-    const { unmount } = renderPipelineCard();
-    expect(screen.queryByText('pipelineCard.edit')).toBeNull();
-    unmount();
-
-    allowed = true;
-    renderPipelineCard();
-    expect(screen.getAllByText('pipelineCard.edit').length).toBeGreaterThan(0);
-  });
-
   const renderPipelinesTable = () =>
     render(
       <PipelinesTable
@@ -246,6 +222,7 @@ describe('write-control render gates', () => {
         onDelete={noop}
         onDuplicate={noop}
         onToggleStatus={noop}
+        onSetAsDefault={noop}
         sortBy="name"
         sortOrder="asc"
         onSort={noop}

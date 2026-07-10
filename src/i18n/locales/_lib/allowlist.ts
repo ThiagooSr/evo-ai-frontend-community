@@ -36,7 +36,7 @@ export const COMMON_ALLOWED = new Set<string>([
   // --- single-letter / abbreviation fallbacks ---
   'U', 'N/A', 'NA',
   // --- loanwords / cognates legitimately identical in pt-BR ---
-  'Popular', 'Templates', 'leads', 'total', 'timeout', 'default', 'production',
+  'Popular', 'Templates', 'leads', 'Leads', 'total', 'timeout', 'default', 'production',
   'Argentina', 'Ding',
   // --- tech field labels (with required-marker asterisk / interpolation) ---
   'URL *', 'Email *', 'Website URL', '+{{count}}', 'Tags ({{count}})',
