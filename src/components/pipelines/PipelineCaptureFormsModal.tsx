@@ -123,7 +123,7 @@ export default function PipelineCaptureFormsModal({
   };
 
   const copyLink = (form: CrmForm) => {
-    const url = `${window.location.origin}/f/${form.slug}`;
+    const url = `${window.location.origin}/f/${form.id}`;
     navigator.clipboard?.writeText(url);
     toast.success(t('captureForms.linkCopied'));
   };
@@ -187,7 +187,7 @@ export default function PipelineCaptureFormsModal({
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {t('captureForms.leadsCount', { count: form.leads_count ?? 0 })}
-                        {' · /f/'}
+                        {' · '}
                         {form.slug}
                       </div>
                     </div>
@@ -205,7 +205,7 @@ export default function PipelineCaptureFormsModal({
                         variant="ghost"
                         size="sm"
                         className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                        onClick={() => window.open(`/f/${form.slug}`, '_blank')}
+                        onClick={() => window.open(`/f/${form.id}`, '_blank')}
                         title={t('captureForms.openLink')}
                       >
                         <ExternalLink className="h-4 w-4" />
