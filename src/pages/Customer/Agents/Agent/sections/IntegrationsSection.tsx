@@ -104,7 +104,11 @@ const IntegrationsSection = ({
   // pelo administrador. Google Calendar / Sheets usam OAuth global e portanto
   // só ficam disponíveis quando o mapa `available` (endpoint de disponibilidade
   // do CRM) indica que o admin configurou as chaves correspondentes.
-  const ALWAYS_AVAILABLE_INTEGRATIONS = ['elevenlabs', 'knowledge-nexus'];
+  // Google Calendar / Sheets connect via per-agent OAuth (their own config
+  // dialogs), not a globally-configured client credential — so they are always
+  // available, like ElevenLabs (API key). Keeping them out of this list left them
+  // stuck on "NÃO DISPONÍVEL" despite the render logic already wiring their dialogs.
+  const ALWAYS_AVAILABLE_INTEGRATIONS = ['elevenlabs', 'knowledge-nexus', 'google-calendar', 'google-sheets'];
 
   const availableIntegrations: Integration[] = [
     {
