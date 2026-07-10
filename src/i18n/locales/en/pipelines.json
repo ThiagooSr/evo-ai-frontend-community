@@ -415,6 +415,8 @@
     "finalizeMessagePlaceholder": "Closing message (optional)...",
     "inactivity": {
       "minutes": "minutes",
+      "hour": "hour",
+      "hours": "hours",
       "base": {
         "no_customer_reply": "Customer not replying",
         "stage_stagnation": "Stuck in stage"

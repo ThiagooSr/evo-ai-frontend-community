@@ -415,6 +415,8 @@
     "finalizeMessagePlaceholder": "Mensagem de encerramento (opcional)...",
     "inactivity": {
       "minutes": "minutos",
+      "hour": "hora",
+      "hours": "horas",
       "base": {
         "no_customer_reply": "Cliente sem responder",
         "stage_stagnation": "Parado na etapa"
