@@ -43,8 +43,10 @@ const IntegrationsSection = ({
   const [showGoogleSheetsConfig, setShowGoogleSheetsConfig] = useState(false);
   const [showKnowledgeNexusConfig, setShowKnowledgeNexusConfig] = useState(false);
 
-  // Use custom hook for integrations status
-  const { credentialsConfigured, isCheckingIntegrations, isConnected, reloadConfigs } =
+  // Use custom hook for integrations status.
+  // `available` is the DISPONIBILIDADE signal (CRM :3000 endpoint) used to gate
+  // "Em breve"/ATIVAR-disabled; `isConnected` is the per-agent "connected" state.
+  const { available, isCheckingIntegrations, isConnected, reloadConfigs } =
     useIntegrations(agentId);
 
   // Persist an integration immediately via the backend Upsert endpoint, then
@@ -98,10 +100,10 @@ const IntegrationsSection = ({
   };
 
   // Integrações que sempre estão disponíveis porque o usuário fornece sua
-  // própria credencial (API key) — não dependem de OAuth global configurado
+  // própria credencial (API key). Não dependem de OAuth global configurado
   // pelo administrador. Google Calendar / Sheets usam OAuth global e portanto
-  // só ficam disponíveis quando `credentialsConfigured` indica que o admin
-  // configurou as chaves correspondentes.
+  // só ficam disponíveis quando o mapa `available` (endpoint de disponibilidade
+  // do CRM) indica que o admin configurou as chaves correspondentes.
   const ALWAYS_AVAILABLE_INTEGRATIONS = ['elevenlabs', 'knowledge-nexus'];
 
   const availableIntegrations: Integration[] = [
@@ -178,7 +180,7 @@ const IntegrationsSection = ({
                 // Integrações que sempre estão disponíveis (ElevenLabs usa API Key, Google Calendar configurado localmente)
                 const isAlwaysAvailable = ALWAYS_AVAILABLE_INTEGRATIONS.includes(integration.id);
                 const hasCredentials =
-                  isAlwaysAvailable || (credentialsConfigured[integration.id] ?? false);
+                  isAlwaysAvailable || (available[integration.id] ?? false);
                 const connected = isConnected(integration.id);
 
                 return (

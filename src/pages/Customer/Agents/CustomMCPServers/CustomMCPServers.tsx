@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { usePermissions } from '@/contexts/PermissionsContext';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -27,11 +28,12 @@ import { CustomMCPServerCard } from '@/components/customMcpServers';
 import CustomMCPServersHeader from '@/components/customMcpServers/CustomMCPServersHeader';
 import CustomMCPServersTable from '@/components/customMcpServers/CustomMCPServersTable';
 import CustomMCPServersPagination from '@/components/customMcpServers/CustomMCPServersPagination';
-import CustomMCPServerModal from '@/components/customMcpServers/CustomMCPServerModal';
+import { CustomMCPServerWizardModal } from '@/components/customMcpServers';
 import CustomMCPServerDetails from '@/components/customMcpServers/CustomMCPServerDetails';
 import CustomMCPServersFilter from '@/components/customMcpServers/CustomMCPServersFilter';
 import {
   listCustomMcpServers,
+  getCustomMcpServer,
   createCustomMcpServer,
   updateCustomMcpServer,
   deleteCustomMcpServer,
@@ -64,12 +66,17 @@ const INITIAL_STATE: CustomMcpServersState = {
 export default function CustomMCPServers() {
   const { can, isReady: permissionsReady } = usePermissions();
   const { t } = useLanguage('customMcpServers');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { id: editServerId } = useParams<{ id: string }>();
+  const isWizardCreate = location.pathname === '/agents/custom-mcp-servers/new';
+  const isWizardEdit = !!editServerId && location.pathname.endsWith('/edit');
+  const isWizardOpen = isWizardCreate || isWizardEdit;
   const [state, setState] = useState<CustomMcpServersState>(INITIAL_STATE);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [serverToDelete, setServerToDelete] = useState<CustomMcpServer | null>(null);
 
-  const [serverModalOpen, setServerModalOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<CustomMcpServer | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [detailsServer, setDetailsServer] = useState<CustomMcpServer | null>(null);
@@ -247,7 +254,7 @@ export default function CustomMCPServers() {
       return;
     }
     setEditingServer(null);
-    setServerModalOpen(true);
+    navigate('/agents/custom-mcp-servers/new');
   };
 
   const handleEditServer = (server: CustomMcpServer) => {
@@ -256,8 +263,33 @@ export default function CustomMCPServers() {
       return;
     }
     setEditingServer(server);
-    setServerModalOpen(true);
+    navigate(`/agents/custom-mcp-servers/${server.id}/edit`);
   };
+
+  // Prefill the wizard on deep-link/refresh into an edit URL: use the cached
+  // server from the current list if present, else fetch it by id.
+  useEffect(() => {
+    if (!isWizardEdit || !editServerId) return;
+    if (editingServer?.id === editServerId) return;
+    const cached = state.servers.find(server => server.id === editServerId);
+    if (cached) {
+      setEditingServer(cached);
+      return;
+    }
+    let cancelled = false;
+    getCustomMcpServer(editServerId)
+      .then(fetched => {
+        if (!cancelled && fetched) setEditingServer(fetched);
+      })
+      .catch(err => {
+        console.error('Failed to load Custom MCP server for edit:', err);
+        toast.error(t('errors.loadError'));
+        navigate('/agents/custom-mcp-servers');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isWizardEdit, editServerId, state.servers, editingServer?.id, navigate, t]);
 
   const handleDeleteServer = (server: CustomMcpServer) => {
     if (!can('ai_custom_mcp_servers', 'delete')) {
@@ -349,9 +381,11 @@ export default function CustomMCPServers() {
         loadServers();
       }
 
-      // Close modal and clear editing state
-      setServerModalOpen(false);
+      // Clear editing state; the wizard page navigates back below.
       setEditingServer(null);
+      if (isWizardCreate || isWizardEdit) {
+        navigate('/agents/custom-mcp-servers');
+      }
     } catch (error) {
       console.error('Error saving Custom MCP server:', error);
       toast.error(editingServer ? t('errors.updateError') : t('errors.saveError'));
@@ -363,20 +397,31 @@ export default function CustomMCPServers() {
     }
   };
 
-  // Handle modal close
-  const handleServerModalClose = (open: boolean) => {
-    if (!open) {
-      setServerModalOpen(false);
-      setEditingServer(null);
-    }
-  };
-
   const handleDetailsModalClose = (open: boolean) => {
     if (!open) {
       setDetailsModalOpen(false);
       setDetailsServer(null);
     }
   };
+
+  if (isWizardOpen) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex-1 min-h-0 animate-slideInFromRight">
+          <CustomMCPServerWizardModal
+            embedded
+            open={isWizardOpen}
+            loading={state.loading.create || state.loading.update}
+            server={isWizardEdit ? editingServer || undefined : undefined}
+            onOpenChange={open => {
+              if (!open) navigate('/agents/custom-mcp-servers');
+            }}
+            onSubmit={handleServerFormSubmit}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col p-4" data-tour="agents-custom-mcps-page">
@@ -512,16 +557,6 @@ export default function CustomMCPServers() {
         </DialogContent>
       </Dialog>
 
-      {/* Server Modal */}
-      <CustomMCPServerModal
-        open={serverModalOpen}
-        onOpenChange={handleServerModalClose}
-        server={editingServer || undefined}
-        mode={!editingServer ? 'create' : 'edit'}
-        loading={state.loading.create || state.loading.update}
-        onSubmit={handleServerFormSubmit}
-      />
-
       {/* Server Details Modal */}
       <CustomMCPServerDetails
         open={detailsModalOpen}
@@ -529,8 +564,7 @@ export default function CustomMCPServers() {
         server={detailsServer}
         onEdit={server => {
           setDetailsModalOpen(false);
-          setEditingServer(server);
-          setServerModalOpen(true);
+          handleEditServer(server);
         }}
         onTest={handleTestServer}
         isTestLoading={testingServer === detailsServer?.id}

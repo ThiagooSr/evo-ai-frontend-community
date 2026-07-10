@@ -1,4 +1,4 @@
-import api from '@/services/core/api';
+import agentProcessorApi from '@/services/core/agentProcessorApi';
 import type {
   GoogleSheetsConfig,
   GoogleSheetsItem,
@@ -12,7 +12,7 @@ const GoogleSheetsService = {
    */
   async generateAuthorization(agentId: string, email?: string): Promise<GoogleSheetsOAuthResponse> {
     try {
-      const { data } = await api.post(
+      const { data } = await agentProcessorApi.post(
         `/agents/${agentId}/integrations/google-sheets/authorization`,
         { email }
       );
@@ -32,7 +32,7 @@ const GoogleSheetsService = {
     state: string
   ): Promise<GoogleSheetsConnectionResponse> {
     try {
-      const { data } = await api.post(
+      const { data } = await agentProcessorApi.post(
         `/agents/${agentId}/integrations/google-sheets/callback`,
         {
           code,
@@ -51,7 +51,7 @@ const GoogleSheetsService = {
    */
   async getSpreadsheets(agentId: string): Promise<GoogleSheetsItem[]> {
     try {
-      const { data } = await api.get(
+      const { data } = await agentProcessorApi.get(
         `/agents/${agentId}/integrations/google-sheets/spreadsheets`
       );
       return data.spreadsheets || [];
@@ -69,7 +69,7 @@ const GoogleSheetsService = {
     config: Partial<GoogleSheetsConfig>
   ): Promise<{ success: boolean }> {
     try {
-      const { data } = await api.put(
+      const { data } = await agentProcessorApi.put(
         `/agents/${agentId}/integrations/google-sheets`,
         config
       );
@@ -85,7 +85,7 @@ const GoogleSheetsService = {
    */
   async disconnect(agentId: string): Promise<{ success: boolean }> {
     try {
-      const { data } = await api.delete(
+      const { data } = await agentProcessorApi.delete(
         `/agents/${agentId}/integrations/google-sheets`
       );
       return data;

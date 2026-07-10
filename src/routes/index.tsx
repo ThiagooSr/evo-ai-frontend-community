@@ -1261,6 +1261,36 @@ const AppRouter = () => {
           />
 
           <Route
+            path="/agents/custom-mcp-servers/new"
+            element={
+              <PrivateRoute>
+                <CustomerRoute>
+                  <MainLayout>
+                    <PermissionRoute resource="ai_custom_mcp_servers" action="create">
+                      <CustomMCPServers />
+                    </PermissionRoute>
+                  </MainLayout>
+                </CustomerRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/agents/custom-mcp-servers/:id/edit"
+            element={
+              <PrivateRoute>
+                <CustomerRoute>
+                  <MainLayout>
+                    <PermissionRoute resource="ai_custom_mcp_servers" action="update">
+                      <CustomMCPServers />
+                    </PermissionRoute>
+                  </MainLayout>
+                </CustomerRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
             path="/agents/tools"
             element={
               <PrivateRoute>
