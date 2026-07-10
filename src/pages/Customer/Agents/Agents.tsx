@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@evoapi/design-system';
-import { AgentsTable, AgentsHeader, AgentsPagination, AgentCard as AgentCardItem, AgentWizardModal, AgentsFilter } from '@/components/agents';
+import { AgentsTable, AgentsHeader, AgentsPagination, AgentWizardModal, AgentsFilter } from '@/components/agents';
 import { EmptyState } from '@/components/base';
-import { Bot, Search, Grid3X3, List } from 'lucide-react';
+import { Bot, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermissions } from '@/contexts/PermissionsContext';
 import { getAccessibleAgents, deleteAgent } from '@/services/agents';
@@ -13,7 +13,6 @@ import type { BaseFilter, AppliedFilter } from '@/types/core';
 import { useLanguage } from '@/hooks/useLanguage';
 import { ApiKeysModal } from '@/components/ApiKeysModal';
 import { AgentsTour } from '@/tours';
-import { exportAsJson, generateExportFilename } from '@/utils/exportUtils';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import type { PaginationMeta } from '@/types/core';
 import { DEFAULT_PAGE_SIZE } from '@/constants/pagination';
@@ -50,7 +49,6 @@ const Agentes = () => {
 
   const [state, setState] = useState<AgentsState>(INITIAL_STATE);
   const [isApiKeysModalOpen, setIsApiKeysModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<string>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -152,26 +150,6 @@ const Agentes = () => {
       loadAgentsRef.current();
     }
   }, [permissionsReady, permissionsLoading]);
-
-  const handleExportAllAgents = () => {
-    try {
-      const filename = generateExportFilename('agents-export');
-      const result = exportAsJson({ agents: state.agents }, filename, true);
-
-      if (result) {
-        toast.success(t('export.success'), {
-          description: t('export.successDesc', { count: state.agents.length }),
-        });
-      } else {
-        throw new Error('Export failed');
-      }
-    } catch (error) {
-      console.error('Erro ao exportar agentes:', error);
-      toast.error(t('export.error'), {
-        description: t('export.errorDesc'),
-      });
-    }
-  };
 
   const handleCreateAgent = () => {
     if (!can('ai_agents', 'create')) {
@@ -325,7 +303,6 @@ const Agentes = () => {
               searchValue={searchTerm}
               onSearchChange={setSearchTerm}
               onNewAgent={handleCreateAgent}
-              onExport={handleExportAllAgents}
               onManageApiKeys={() => setIsApiKeysModalOpen(true)}
               onBulkDelete={handleBulkDelete}
               onClearSelection={() => setState(prev => ({ ...prev, selectedAgents: [] }))}
@@ -343,27 +320,6 @@ const Agentes = () => {
               onApplyFilters={handleApplyFilters}
               onClearFilters={handleClearFilters}
             />
-
-            <div className="flex items-center justify-end" data-tour="agents-view-toggle">
-              <div className="flex items-center border rounded-lg">
-                <Button
-                  variant={viewMode === 'cards' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('cards')}
-                  className="border-0 rounded-r-none"
-                >
-                  <Grid3X3 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'table' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('table')}
-                  className="border-0 rounded-l-none"
-                >
-                  <List className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
 
             <div data-tour="agents-list">
             {state.loading ? (
@@ -391,23 +347,6 @@ const Agentes = () => {
                   variant: 'outline',
                 }}
               />
-            ) : viewMode === 'cards' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredAgents.map(agent => (
-                  <AgentCardItem
-                    key={agent.id}
-                    agent={agent}
-                    onEdit={() => handleEditAgent(agent.id)}
-                    onDelete={handleDeleteAgent}
-                    onExportAsJSON={() => {
-                      toast.info(t('exportJSON'));
-                    }}
-                    onShare={() => {
-                      toast.info(t('share'));
-                    }}
-                  />
-                ))}
-              </div>
             ) : (
               <AgentsTable
                 agents={filteredAgents}

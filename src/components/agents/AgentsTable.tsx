@@ -160,26 +160,19 @@ export default function AgentsTable({
   ];
 
   return (
-    <div className="space-y-4">
-      <BaseTable<Agent>
-        data={agents}
-        columns={columns}
-        selectable={true}
-        selectedItems={selectedAgents}
-        onSelectionChange={onSelectionChange}
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSort={onSort}
-        loading={loading}
-        emptyMessage={t('table.emptyMessage')}
-        getRowKey={agent => agent.id}
-        className="border rounded-lg"
-      />
-
-      {/* Agent Card Action - Separate from table actions */}
-      <div className="text-xs text-muted-foreground">
-        <p>{t('table.clickToView')}</p>
-      </div>
-    </div>
+    <BaseTable<Agent>
+      data={agents}
+      columns={columns}
+      selectable={true}
+      selectedItems={selectedAgents}
+      onSelectionChange={onSelectionChange}
+      sortBy={sortBy}
+      sortOrder={sortOrder}
+      onSort={onSort}
+      loading={loading}
+      emptyMessage={t('table.emptyMessage')}
+      getRowKey={agent => agent.id}
+      className="border rounded-lg"
+    />
   );
 }
