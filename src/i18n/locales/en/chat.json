@@ -264,6 +264,8 @@
     },
     "banner": {
       "whatsappMessage": "You can only reply to this conversation using a message template due to",
+      "whatsappMessageWithElapsed": "The 24-hour messaging window expired {{elapsed}} ago. You can only reply using a message template due to",
+      "windowExpiringSoon": "⏳ {{remaining}} left to reply freely before the 24-hour messaging window expires.",
       "cannotReply": "You cannot reply because",
       "linkText": "24-hour messaging window restrictions",
       "zapiDisconnected": "WhatsApp disconnected. Connect the number to send messages."

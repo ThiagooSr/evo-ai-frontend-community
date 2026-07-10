@@ -263,6 +263,8 @@
     },
     "banner": {
       "whatsappMessage": "Você só pode responder a esta conversa usando um modelo de mensagem devido a",
+      "whatsappMessageWithElapsed": "A janela de mensagem de 24 horas expirou há {{elapsed}}. Você só pode responder usando um modelo de mensagem devido a",
+      "windowExpiringSoon": "⏳ Restam {{remaining}} para responder livremente antes da janela de mensagem de 24 horas expirar.",
       "cannotReply": "Você não pode responder porque",
       "linkText": "Restrições de janela de mensagem de 24 horas",
       "zapiDisconnected": "WhatsApp desconectado. Conecte o número para enviar mensagens."
