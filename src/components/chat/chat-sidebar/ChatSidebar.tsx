@@ -103,6 +103,8 @@ interface ChatSidebarProps {
   onBulkResolve: () => Promise<void>;
   isBulkResolving?: boolean;
   canBulkResolve?: boolean;
+  /** Largura em px (coluna redimensionável) — controlada pelo pai (Chat.tsx). Sem isto, cai no width responsivo fixo de sempre. */
+  width?: number;
 }
 
 // Prefetch the next page well before the user reaches the end so the loading
@@ -140,6 +142,7 @@ const ChatSidebar = ({
   onBulkResolve,
   isBulkResolving = false,
   canBulkResolve = true,
+  width,
 }: ChatSidebarProps) => {
   const { t } = useLanguage('chat');
   const chatContext = useChatContext();
@@ -979,8 +982,9 @@ const ChatSidebar = ({
       data-tour="chat-sidebar"
       className={`
         ${mobileView === 'list' ? 'flex' : 'hidden'} md:flex
-        w-full ${selectedConversationIds.size > 0 ? 'md:w-96' : 'md:w-80'} border-r bg-card/50 flex-col h-full
+        w-full ${width != null ? 'md:shrink-0' : selectedConversationIds.size > 0 ? 'md:w-96' : 'md:w-80'} border-r bg-card/50 flex-col h-full
       `}
+      style={width != null ? { width: `${width}px` } : undefined}
     >
       {/* Search and Filter Header */}
       <div className="p-4 border-b space-y-3">

@@ -6,7 +6,6 @@ import { labelsService } from '@/services/contacts/labelsService';
 import usersService from '@/services/users/usersService';
 import { Inbox } from '@/types/channels/inbox';
 import type { Pipeline, Team } from '@/types/chat/api';
-import type { Contact } from '@/types/contacts/contact';
 import type { Label } from '@/types/settings';
 import type { User } from '@/types/users';
 
