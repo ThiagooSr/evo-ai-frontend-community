@@ -13,6 +13,13 @@ import { useLanguage } from '@/hooks/useLanguage';
 
 interface ComposerPlusMenuProps {
   disabled?: boolean;
+  /**
+   * Janela de 24h do WhatsApp Cloud expirada: o gatilho "+" continua clicável
+   * (não usa `disabled`), mas só o item "templates" fica ativo — os demais
+   * ficam visíveis e esmaecidos, já que enviá-los falharia do mesmo jeito no
+   * backend. Sem isso o agente fica sem nenhuma rota pra reabrir a conversa.
+   */
+  restrictToTemplatesOnly?: boolean;
   onOpenQuickReplies: () => void;
   onPickDocuments: () => void;
   onPickMedia: () => void;
@@ -33,6 +40,7 @@ const ITEM_ICON_BOX =
  */
 const ComposerPlusMenu: React.FC<ComposerPlusMenuProps> = ({
   disabled = false,
+  restrictToTemplatesOnly = false,
   onOpenQuickReplies,
   onPickDocuments,
   onPickMedia,
@@ -135,28 +143,35 @@ const ComposerPlusMenu: React.FC<ComposerPlusMenuProps> = ({
             zIndex: 100,
           }}
         >
-          {items.map(item => (
-            <div
-              key={item.key}
-              onClick={() => {
-                setOpen(false);
-                item.onClick();
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: '9px 10px',
-                borderRadius: 10,
-                cursor: 'pointer',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#f4f6f9')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            >
-              <span className={ITEM_ICON_BOX}>{item.icon}</span>
-              <span style={{ fontSize: 14.5, color: '#2b3240', fontWeight: 500 }}>{item.label}</span>
-            </div>
-          ))}
+          {items.map(item => {
+            const itemDisabled = restrictToTemplatesOnly && item.key !== 'templates';
+            return (
+              <div
+                key={item.key}
+                onClick={() => {
+                  if (itemDisabled) return;
+                  setOpen(false);
+                  item.onClick();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '9px 10px',
+                  borderRadius: 10,
+                  cursor: itemDisabled ? 'not-allowed' : 'pointer',
+                  opacity: itemDisabled ? 0.4 : 1,
+                }}
+                onMouseEnter={e => {
+                  if (!itemDisabled) e.currentTarget.style.background = '#f4f6f9';
+                }}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <span className={ITEM_ICON_BOX}>{item.icon}</span>
+                <span style={{ fontSize: 14.5, color: '#2b3240', fontWeight: 500 }}>{item.label}</span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

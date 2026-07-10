@@ -716,8 +716,15 @@ const MessageInput: React.FC<MessageInputProps> = ({
             )}
 
             {/* + menu */}
+            {/* isDisabled em canal WhatsApp Cloud só acontece pela janela de 24h (a
+                desconexão Z-API/Evolution é exclusiva de outros providers) — nesse caso
+                a única saída é enviar um template, então o "+" precisa continuar
+                clicável até lá em vez de travar o agente sem nenhuma rota de resposta. */}
             <ComposerPlusMenu
-              disabled={isDisabled || isSending || isPendingConversation}
+              disabled={
+                (isDisabled && !isWhatsAppCloud) || isSending || isPendingConversation
+              }
+              restrictToTemplatesOnly={isDisabled && isWhatsAppCloud && !isSending && !isPendingConversation}
               onOpenQuickReplies={handleCannedResponsesClick}
               onPickDocuments={() =>
                 document.getElementById('composer-file-input-document')?.click()
