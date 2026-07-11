@@ -40,7 +40,9 @@ const GoogleSheetsService = {
           state,
         }
       );
-      return data;
+      // Flatten the { success, data: {...} } envelope so callers read
+      // `.success` (CallbackPage) and `.email`/`.spreadsheets` (onSuccess) directly.
+      return data?.data ? { success: data.success ?? true, ...data.data } : data;
     } catch (error) {
       console.error('GoogleSheetsService.completeAuthorization error:', error);
       throw error;

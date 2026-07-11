@@ -40,7 +40,9 @@ const GoogleCalendarService = {
           state,
         }
       );
-      return data;
+      // Flatten the { success, data: {...} } envelope so callers read
+      // `.success` (CallbackPage) and `.email`/`.calendars` (onSuccess) directly.
+      return data?.data ? { success: data.success ?? true, ...data.data } : data;
     } catch (error) {
       console.error('GoogleCalendarService.completeAuthorization error:', error);
       throw error;
