@@ -211,6 +211,15 @@ const IntegrationsSection = ({
                         </span>
                       )}
 
+                      {/* Discreet connected indicator — mirrors the admin Integrations
+                          screen (small green text, no oversized button). */}
+                      {connected && (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600">
+                          <Check className="h-3.5 w-3.5" />
+                          {t('edit.integrations.active') || 'Ativo'}
+                        </span>
+                      )}
+
                       {/* Descrição */}
                       <CardDescription className="text-sm leading-relaxed">
                         {integration.description}
@@ -221,16 +230,8 @@ const IntegrationsSection = ({
                     <CardContent className="mt-auto pt-0 space-y-2">
                       {connected ? (
                         <>
-                          {/* Botão de Status - Conectado */}
-                          <Button
-                            variant="success"
-                            className="w-full gap-2 bg-green-600 text-white hover:bg-green-700 border-green-600 cursor-default"
-                            disabled
-                          >
-                            <Check className="h-4 w-4" />
-                            {t('edit.integrations.active') || 'ATIVO'}
-                          </Button>
-                          {/* Botão de Configuração */}
+                          {/* Only the configure action — the connected state is shown
+                              by the discreet badge near the title (see above). */}
                           <Button
                             variant="outline"
                             className="w-full gap-2"
