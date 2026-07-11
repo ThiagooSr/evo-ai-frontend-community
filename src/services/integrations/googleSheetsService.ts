@@ -55,8 +55,11 @@ const GoogleSheetsService = {
       const { data } = await agentProcessorApi.get(
         `/agents/${agentId}/integrations/google-sheets/spreadsheets`
       );
-      // Processor wraps the payload as { success, data: { spreadsheets }, message }.
-      return data?.data?.spreadsheets ?? data?.spreadsheets ?? [];
+      // Processor wraps the payload as { success, data, message } where `data`
+      // is the spreadsheets array directly (older shapes nested it under
+      // `data.spreadsheets`); handle both.
+      const payload = data?.data ?? data;
+      return Array.isArray(payload) ? payload : (payload?.spreadsheets ?? []);
     } catch (error) {
       console.error('GoogleSheetsService.getSpreadsheets error:', error);
       throw error;

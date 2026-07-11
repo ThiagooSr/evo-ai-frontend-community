@@ -55,8 +55,11 @@ const GoogleCalendarService = {
       const { data } = await agentProcessorApi.get(
         `/agents/${agentId}/integrations/google-calendar/calendars`
       );
-      // Processor wraps the payload as { success, data: { calendars }, message }.
-      return data?.data?.calendars ?? data?.calendars ?? [];
+      // Processor wraps the payload as { success, data, message } where `data`
+      // is the calendars array directly (older shapes nested it under
+      // `data.calendars`); handle both.
+      const payload = data?.data ?? data;
+      return Array.isArray(payload) ? payload : (payload?.calendars ?? []);
     } catch (error) {
       console.error('GoogleCalendarService.getCalendars error:', error);
       throw error;
