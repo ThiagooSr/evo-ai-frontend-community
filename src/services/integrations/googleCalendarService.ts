@@ -16,7 +16,8 @@ const GoogleCalendarService = {
         `/agents/${agentId}/integrations/google-calendar/authorization`,
         { email }
       );
-      return data;
+      // Processor wraps the payload as { success, data: { url }, message }.
+      return data?.data ?? data;
     } catch (error) {
       console.error('GoogleCalendarService.generateAuthorization error:', error);
       throw error;
@@ -150,7 +151,7 @@ const GoogleCalendarService = {
    */
   getOAuthCallbackUrl(): string {
     const baseUrl = window.location.origin;
-    return `${baseUrl}/oauth/google-calendar/callback`;
+    return `${baseUrl}/google-calendar/callback`;
   },
 };
 

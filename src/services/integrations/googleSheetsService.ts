@@ -16,7 +16,8 @@ const GoogleSheetsService = {
         `/agents/${agentId}/integrations/google-sheets/authorization`,
         { email }
       );
-      return data;
+      // Processor wraps the payload as { success, data: { url }, message }.
+      return data?.data ?? data;
     } catch (error) {
       console.error('GoogleSheetsService.generateAuthorization error:', error);
       throw error;
@@ -100,7 +101,7 @@ const GoogleSheetsService = {
    */
   getOAuthCallbackUrl(): string {
     const baseUrl = window.location.origin;
-    return `${baseUrl}/oauth/google-sheets/callback`;
+    return `${baseUrl}/google-sheets/callback`;
   },
 };
 
