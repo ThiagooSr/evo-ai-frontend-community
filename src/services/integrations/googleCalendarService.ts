@@ -16,7 +16,8 @@ const GoogleCalendarService = {
         `/agents/${agentId}/integrations/google-calendar/authorization`,
         { email }
       );
-      return data;
+      // Processor wraps the payload as { success, data: { url }, message }.
+      return data?.data ?? data;
     } catch (error) {
       console.error('GoogleCalendarService.generateAuthorization error:', error);
       throw error;
@@ -54,7 +55,11 @@ const GoogleCalendarService = {
       const { data } = await agentProcessorApi.get(
         `/agents/${agentId}/integrations/google-calendar/calendars`
       );
-      return data.calendars || [];
+      // Processor wraps the payload as { success, data, message } where `data`
+      // is the calendars array directly (older shapes nested it under
+      // `data.calendars`); handle both.
+      const payload = data?.data ?? data;
+      return Array.isArray(payload) ? payload : (payload?.calendars ?? []);
     } catch (error) {
       console.error('GoogleCalendarService.getCalendars error:', error);
       throw error;
@@ -150,7 +155,7 @@ const GoogleCalendarService = {
    */
   getOAuthCallbackUrl(): string {
     const baseUrl = window.location.origin;
-    return `${baseUrl}/oauth/google-calendar/callback`;
+    return `${baseUrl}/google-calendar/callback`;
   },
 };
 
