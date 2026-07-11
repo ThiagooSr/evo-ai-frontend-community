@@ -80,9 +80,6 @@ export default function CallbackPage({ integrationName, onCallback, onSuccess, r
       // Pass empty strings if not found - callback can decode state itself if needed
       const response = await onCallback(code, state, agentIdFromState || '');
 
-      // TEMP debug: capture the runtime shape of the callback response.
-      console.log('[CB-DEBUG]', integrationName, 'success=', response?.success, 'keys=', response && Object.keys(response), 'raw=', JSON.stringify(response)?.slice(0, 160));
-
       if (response.success) {
         setStatus('success');
         const usernameText = response.username ? t('callback.success.username', { username: response.username }) : '';
