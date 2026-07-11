@@ -55,7 +55,8 @@ const GoogleSheetsService = {
       const { data } = await agentProcessorApi.get(
         `/agents/${agentId}/integrations/google-sheets/spreadsheets`
       );
-      return data.spreadsheets || [];
+      // Processor wraps the payload as { success, data: { spreadsheets }, message }.
+      return data?.data?.spreadsheets ?? data?.spreadsheets ?? [];
     } catch (error) {
       console.error('GoogleSheetsService.getSpreadsheets error:', error);
       throw error;
