@@ -152,6 +152,14 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
   };
 
   const handleGoBack = () => {
+    // When the channel was preselected (entered straight into a channel, skipping the
+    // channel grid), don't reveal the grid on the way back — exit to /channels instead,
+    // mirroring how the grid was skipped on entry. A provider grid (a step the user did
+    // go through) stays a valid back stop, so only short-circuit at the channel level.
+    if (preselectedChannelId && selectedChannel && !selectedProvider) {
+      exitToChannels();
+      return;
+    }
     // goBack() steps back one level (provider -> channel). When there is nowhere
     // left to go back to, leave the flow.
     if (!goBack()) {
