@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useLanguage } from '@/hooks/useLanguage';
 import {
@@ -42,23 +42,30 @@ import { EmailChannelTour } from '@/tours/EmailChannelTour';
 
 interface NewChannelProps {
   /**
-   * Quando fornecido, o canal correspondente (por `id` em getChannelTypes) é
-   * pré-selecionado no mount, pulando o grid de seleção de canal. Usado quando
-   * o NewChannel é montado a partir de uma tela que já escolheu o canal.
+   * When provided, the matching channel (by `id` in getChannelTypes) is
+   * preselected on mount, skipping the channel selection grid. Used when
+   * NewChannel is mounted from a screen that already picked the channel.
    */
   initialChannelId?: string;
   /**
-   * Callback opcional invocado quando o usuário sairia do fluxo (voltar/cancelar
-   * no topo, ou clique no breadcrumb "Canais"). Quando fornecido, é chamado em
-   * vez de navegar para /channels — permite que um host (ex.: modal) feche a si
-   * mesmo. Sem ele, o comportamento original de navegação é mantido.
+   * Optional callback invoked when the user would leave the flow (back/cancel
+   * at the top, or clicking the "Channels" breadcrumb). When provided, it is
+   * called instead of navigating to /channels — letting a host (e.g. a modal)
+   * close itself. Without it, the original navigation behavior is kept.
    */
   onExit?: () => void;
 }
 
 export default function NewChannel({ initialChannelId, onExit }: NewChannelProps = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useLanguage('channels');
+
+  // The standalone route `/channels/new` renders <NewChannel /> without props,
+  // so an explicit `initialChannelId` prop takes priority, then the channel type
+  // passed through router state by the Channels overview "Connect" action.
+  const preselectedChannelId =
+    initialChannelId ?? (location.state as { channelId?: string } | null)?.channelId;
 
   // Use hooks
   const {
@@ -84,7 +91,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
   const { isSubmitting, isTesting, testConnection, submitCreate, healthCheckPassed } =
     useChannelSubmission(form);
 
-  // Generate channel types with dynamic config
+  // Generate channel types with dynamic config.
   const channelTypes = useMemo(
     () =>
       getChannelTypes().map(channel => {
@@ -111,23 +118,28 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
     [canEmailGoogle, canEmailMicrosoft, t],
   );
 
-  // Pré-seleciona o canal quando montado com initialChannelId (pula o grid).
-  // Só roda uma vez, e apenas se nenhum canal estiver selecionado ainda.
-  // Usa handleChannelSelect direto (não a versão com validação canFB/canIG): o
-  // canal já foi escolhido pela tela host, e o gating de config dos canais Meta
-  // é aplicado adiante (no provider/form), não aqui — senão um config ainda não
-  // carregado (async) faria cair no grid de seleção inteiro.
+  // Preselect the channel when a type was provided (skips the grid). Applied at
+  // most once (guarded by a ref): channelTypes can change identity later (async
+  // Meta config load flips canEmail*, or the i18n `t` becomes ready), and without
+  // the guard this effect would re-fire and force the preselected channel back on
+  // a user who has already navigated back to the grid — trapping them. Uses
+  // handleChannelSelect directly (not the canFB/canIG-validated variant): the
+  // channel was already chosen by the host screen, and Meta channel config gating
+  // is applied later (at the provider/form step), not here.
+  const preselectAppliedRef = useRef(false);
   useEffect(() => {
-    if (!initialChannelId || selectedChannel) return;
-    const channel = channelTypes.find(c => c.id === initialChannelId);
+    if (preselectAppliedRef.current || !preselectedChannelId || selectedChannel) return;
+    const channel = channelTypes.find(c => c.id === preselectedChannelId);
     if (channel) {
+      preselectAppliedRef.current = true;
       handleChannelSelect(channel);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialChannelId, channelTypes]);
+  }, [preselectedChannelId, channelTypes]);
 
-  // Sai do fluxo voltando à lista de canais. Quando um host fornece onExit
-  // (ex.: modal no shell), fecha-o; senão navega para /channels (CRM standalone).
+  // Leave the flow, returning to the channels list. When a host provides onExit
+  // (e.g. a modal in the shell), close it; otherwise navigate to /channels
+  // (standalone CRM).
   const exitToChannels = () => {
     if (onExit) {
       onExit();
@@ -137,17 +149,18 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
   };
 
   const handleGoBack = () => {
-    // goBack() volta um nível (provider -> canal). Quando não há mais para onde
-    // voltar, sai do fluxo.
+    // goBack() steps back one level (provider -> channel). When there is nowhere
+    // left to go back to, leave the flow.
     if (!goBack()) {
       exitToChannels();
     }
   };
 
-  // Após criar um canal com sucesso. No CRM standalone navega para as settings
-  // do inbox recém-criado. Embutido (onExit fornecido), navigate não resolve
-  // dentro do MemoryRouter sem <Routes>, então apenas fechamos o host (o canal
-  // já foi criado); a tela host reabre as settings se desejar.
+  // After a channel is created successfully. In standalone CRM, navigate to the
+  // freshly created inbox's settings. When embedded (onExit provided), navigate
+  // does not resolve inside the MemoryRouter without <Routes>, so we just close
+  // the host (the channel is already created); the host screen reopens settings
+  // if it wants to.
   const handleCreated = (createdId?: string) => {
     if (onExit) {
       onExit();
@@ -175,8 +188,8 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
       if (provider.id === 'whatsapp_cloud' && !canWpCloud) {
         return toast.error(t('newChannel.messages.whatsappCloudConfigMissing'));
       }
-      // Evolution e Evolution Go: sempre permitidos. Quando o admin não tem
-      // config global, o próprio formulário do canal coleta URL + token.
+      // Evolution and Evolution Go: always allowed. When the admin has no global
+      // config, the channel form itself collects the URL + token.
     }
     if (selectedChannel?.type === 'email') {
       if (provider.id === 'google' && !canEmailGoogle) {
@@ -223,7 +236,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
     if (!selectedChannel) {
       breadcrumbs.push({ label: t('newChannel.breadcrumb.createChannel'), active: true });
     } else if (!selectedChannel.providers) {
-      // Canais sem providers (website, telegram, api) - link clicável para voltar
+      // Channels without providers (website, telegram, api) - clickable link to go back
       breadcrumbs.push(
         {
           label: t('newChannel.breadcrumb.createChannel'),
@@ -232,7 +245,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
         { label: selectedChannel.name, active: true },
       );
     } else if (!selectedProvider && selectedChannel.providers) {
-      // Canais com providers mas nenhum selecionado
+      // Channels with providers but none selected yet
       breadcrumbs.push(
         {
           label: t('newChannel.breadcrumb.createChannel'),
@@ -241,7 +254,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
         { label: selectedChannel.name, active: true },
       );
     } else {
-      // Canal e provider selecionados
+      // Channel and provider both selected
       breadcrumbs.push(
         {
           label: t('newChannel.breadcrumb.createChannel'),
@@ -410,7 +423,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
     );
   };
 
-  // Se não houver um canal selecionado, mostrar o grid de canais
+  // If no channel is selected, show the channel grid
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 overflow-auto pb-8">
@@ -428,7 +441,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
             />
           </>
 
-          // Se houver um canal selecionado, mas não houver um provider selecionado, mostrar o grid de providers
+          // If a channel is selected but no provider is selected, show the provider grid
         ) : !selectedProvider && selectedChannel.providers ? (
           <>
             <ProviderSelectionTour channelType={selectedChannel.type} />
@@ -462,7 +475,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
             />
           </>
 
-          // Se houver um canal selecionado e um provider selecionado, mostrar o formulário de configuração
+          // If a channel and a provider are both selected, show the configuration form
         ) : (
           <>
             <div className={pageContainer} >
@@ -501,7 +514,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
                               !form.phone_number_id ||
                               !form.business_account_id ||
                               !form.waba_id)) ||
-                          // Desabilita salvar se for Evolution ou Evolution Go e o health check não passou
+                          // Disable save for Evolution or Evolution Go when the health check did not pass
                           ((selectedProvider?.id === 'evolution' ||
                             selectedProvider?.id === 'evolution_go') &&
                             healthCheckPassed !== true)
