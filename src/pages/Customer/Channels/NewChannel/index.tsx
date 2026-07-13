@@ -43,15 +43,15 @@ import { EmailChannelTour } from '@/tours/EmailChannelTour';
 interface NewChannelProps {
   /**
    * When provided, the matching channel (by `id` in getChannelTypes) is
-   * preselected on mount, skipping the channel selection grid. Used when
-   * NewChannel is mounted from a screen that already picked the channel.
+   * pre-selected on mount, skipping the channel grid. Used when NewChannel is
+   * mounted from a screen that already picked the channel (e.g. the modal host).
    */
   initialChannelId?: string;
   /**
-   * Optional callback invoked when the user would leave the flow (back/cancel
-   * at the top, or clicking the "Channels" breadcrumb). When provided, it is
-   * called instead of navigating to /channels — letting a host (e.g. a modal)
-   * close itself. Without it, the original navigation behavior is kept.
+   * Optional callback invoked when the user would leave the flow (back/cancel at
+   * the top, or the "Channels" breadcrumb). When provided, it is called instead
+   * of navigating to /channels — letting a host (e.g. a modal) close itself.
+   * Its presence also switches NewChannel into the compact "embedded" layout.
    */
   onExit?: () => void;
 }
@@ -61,11 +61,18 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
   const location = useLocation();
   const { t } = useLanguage('channels');
 
-  // The standalone route `/channels/new` renders <NewChannel /> without props,
-  // so an explicit `initialChannelId` prop takes priority, then the channel type
-  // passed through router state by the Channels overview "Connect" action.
+  // Embedded mode: mounted inside a host (e.g. the modal). Drops the full-page
+  // chrome (max-w-6xl container, page header) so the flow fits a compact modal.
+  const embedded = !!onExit;
+
+  // Standalone `/channels/new` renders <NewChannel /> without props, so an explicit
+  // initialChannelId wins, then the channel type passed via router state by the
+  // Channels overview "Connect" action. Applied at most once (guarded ref) because
+  // channelTypes identity can change on async config/i18n load — without the guard the
+  // effect would force the preselected channel back on a user who navigated to the grid.
   const preselectedChannelId =
     initialChannelId ?? (location.state as { channelId?: string } | null)?.channelId;
+  const preselectAppliedRef = useRef(false);
 
   // Use hooks
   const {
@@ -91,7 +98,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
   const { isSubmitting, isTesting, testConnection, submitCreate, healthCheckPassed } =
     useChannelSubmission(form);
 
-  // Generate channel types with dynamic config.
+  // Generate channel types with dynamic config
   const channelTypes = useMemo(
     () =>
       getChannelTypes().map(channel => {
@@ -118,15 +125,12 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
     [canEmailGoogle, canEmailMicrosoft, t],
   );
 
-  // Preselect the channel when a type was provided (skips the grid). Applied at
-  // most once (guarded by a ref): channelTypes can change identity later (async
-  // Meta config load flips canEmail*, or the i18n `t` becomes ready), and without
-  // the guard this effect would re-fire and force the preselected channel back on
-  // a user who has already navigated back to the grid — trapping them. Uses
-  // handleChannelSelect directly (not the canFB/canIG-validated variant): the
-  // channel was already chosen by the host screen, and Meta channel config gating
-  // is applied later (at the provider/form step), not here.
-  const preselectAppliedRef = useRef(false);
+  // Pre-selects the channel when mounted with initialChannelId (skips the grid).
+  // Runs once, only while no channel is selected yet. Uses handleChannelSelect
+  // directly (not the canFB/canIG-validated variant): the channel was already
+  // picked by the host, and Meta channel config gating is applied later (at the
+  // provider/form), not here — otherwise a still-loading (async) config would
+  // bounce the user back to the whole channel grid.
   useEffect(() => {
     if (preselectAppliedRef.current || !preselectedChannelId || selectedChannel) return;
     const channel = channelTypes.find(c => c.id === preselectedChannelId);
@@ -137,9 +141,8 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preselectedChannelId, channelTypes]);
 
-  // Leave the flow, returning to the channels list. When a host provides onExit
-  // (e.g. a modal in the shell), close it; otherwise navigate to /channels
-  // (standalone CRM).
+  // Leaves the flow back to the channel list. When a host provides onExit
+  // (e.g. the modal), close it; otherwise navigate to /channels (CRM standalone).
   const exitToChannels = () => {
     if (onExit) {
       onExit();
@@ -156,11 +159,10 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
     }
   };
 
-  // After a channel is created successfully. In standalone CRM, navigate to the
-  // freshly created inbox's settings. When embedded (onExit provided), navigate
-  // does not resolve inside the MemoryRouter without <Routes>, so we just close
-  // the host (the channel is already created); the host screen reopens settings
-  // if it wants to.
+  // After a channel is created. In CRM standalone, navigate to the new inbox
+  // settings. Embedded (onExit provided), navigate would not resolve inside the
+  // MemoryRouter without <Routes>, so we just close the host (the channel was
+  // already created); the host screen can reopen the settings if it wants to.
   const handleCreated = (createdId?: string) => {
     if (onExit) {
       onExit();
@@ -184,6 +186,9 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
   };
 
   const handleProviderSelectWithValidation = (provider: ProviderType) => {
+    // Defense in depth: Twilio is "coming soon" and rendered disabled in the
+    // picker; ignore any select that slips through (WhatsApp and SMS).
+    if (provider.id === 'twilio') return;
     if (selectedChannel?.type === 'whatsapp') {
       if (provider.id === 'whatsapp_cloud' && !canWpCloud) {
         return toast.error(t('newChannel.messages.whatsappCloudConfigMissing'));
@@ -236,7 +241,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
     if (!selectedChannel) {
       breadcrumbs.push({ label: t('newChannel.breadcrumb.createChannel'), active: true });
     } else if (!selectedChannel.providers) {
-      // Channels without providers (website, telegram, api) - clickable link to go back
+      // Channels without providers (website, telegram, api) - clickable link back
       breadcrumbs.push(
         {
           label: t('newChannel.breadcrumb.createChannel'),
@@ -245,7 +250,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
         { label: selectedChannel.name, active: true },
       );
     } else if (!selectedProvider && selectedChannel.providers) {
-      // Channels with providers but none selected yet
+      // Canais com providers mas nenhum selecionado
       breadcrumbs.push(
         {
           label: t('newChannel.breadcrumb.createChannel'),
@@ -254,7 +259,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
         { label: selectedChannel.name, active: true },
       );
     } else {
-      // Channel and provider both selected
+      // Channel and provider selected
       breadcrumbs.push(
         {
           label: t('newChannel.breadcrumb.createChannel'),
@@ -270,7 +275,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
     return breadcrumbs;
   };
 
-  const pageContainer = 'mx-auto w-full max-w-6xl px-4 md:px-6';
+  const pageContainer = embedded ? 'px-4 md:px-6' : 'mx-auto w-full max-w-6xl px-4 md:px-6';
 
   const renderForm = () => {
     if (!selectedChannel) return null;
@@ -398,10 +403,21 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
     }
   };
 
+  // Channels whose config screen uses the standardized Display Name + auto
+  // Channel Name header hoisted into FormContainer. Meta/Email flows own their
+  // own identity fields (page name, email address) so they opt out.
+  const showNameFields =
+    selectedChannel?.type === 'web_widget' ||
+    selectedChannel?.type === 'whatsapp' ||
+    selectedChannel?.type === 'sms' ||
+    selectedChannel?.type === 'telegram' ||
+    selectedChannel?.type === 'api';
+
+  // The generic footer (Cancel + "Create Channel" + ConnectionTest) drives the
+  // shared submitCreate path. Facebook / Instagram / Email own their submit
+  // (OAuth redirect / page pick) and render their own action in the same footer
+  // band; likewise Evo Hub for WhatsApp Cloud (HubConnectButton). Those opt out.
   const shouldShowFooter = () => {
-    // When Evo Hub is the active provider for Meta channels, the form
-    // itself owns the "create" action via HubConnectButton — the page-level
-    // footer would offer a second submit path that 422s (no api_key/phone_id).
     const hubOwnsWhatsappCloud =
       selectedChannel?.type === 'whatsapp' &&
       selectedProvider?.id === 'whatsapp_cloud' &&
@@ -423,7 +439,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
     );
   };
 
-  // If no channel is selected, show the channel grid
+  // No channel selected yet: show the channel grid
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 overflow-auto pb-8">
@@ -441,7 +457,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
             />
           </>
 
-          // If a channel is selected but no provider is selected, show the provider grid
+          // Channel selected but no provider yet: show the provider grid
         ) : !selectedProvider && selectedChannel.providers ? (
           <>
             <ProviderSelectionTour channelType={selectedChannel.type} />
@@ -450,6 +466,8 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
               channelType={selectedChannel?.type || 'whatsapp'}
               providers={selectedChannel?.providers || []}
               isDisabled={providerId => {
+                // Twilio is not wired yet (WhatsApp and SMS) — "coming soon".
+                if (providerId === 'twilio') return true;
                 if (selectedChannel?.type === 'whatsapp') {
                   if (providerId === 'whatsapp_cloud') return !canWpCloud;
                 }
@@ -460,6 +478,9 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
                 return false;
               }}
               disabledTooltip={providerId => {
+                if (providerId === 'twilio') {
+                  return t('newChannel.providers.twilio.comingSoon');
+                }
                 const gated =
                   (selectedChannel?.type === 'whatsapp' &&
                     providerId === 'whatsapp_cloud' &&
@@ -475,25 +496,30 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
             />
           </>
 
-          // If a channel and a provider are both selected, show the configuration form
+          // Channel and provider selected: show the standardized config screen
         ) : (
           <>
             <div className={pageContainer} >
               <ChannelBreadcrumb items={getBreadcrumbs()} onBack={handleGoBack} />
             </div>
             <div className={pageContainer}>
-              <div className="max-w-4xl mx-auto">
-                <div className="mb-6 md:mb-8">
-                  <h1 className="text-2xl font-bold tracking-tight text-sidebar-foreground mb-2">
-                    {t('newChannel.configureTitle')}
-                  </h1>
-                  <p className="text-sidebar-foreground/70">{t('newChannel.description')}</p>
-                </div>
+              <div className={embedded ? '' : 'max-w-4xl mx-auto'}>
+                {!embedded && (
+                  <div className="mb-6 md:mb-8">
+                    <h1 className="text-2xl font-bold tracking-tight text-sidebar-foreground mb-2">
+                      {t('newChannel.configureTitle')}
+                    </h1>
+                    <p className="text-sidebar-foreground/70">{t('newChannel.description')}</p>
+                  </div>
+                )}
 
                 {renderChannelTour()}
                 <FormContainer
                   selectedChannel={selectedChannel}
                   selectedProvider={selectedProvider}
+                  showNameFields={showNameFields}
+                  form={form}
+                  onFormChange={(key, value) => updateForm({ [key]: value })}
                   footer={
                     shouldShowFooter() ? (
                       <FormFooter
@@ -514,7 +540,7 @@ export default function NewChannel({ initialChannelId, onExit }: NewChannelProps
                               !form.phone_number_id ||
                               !form.business_account_id ||
                               !form.waba_id)) ||
-                          // Disable save for Evolution or Evolution Go when the health check did not pass
+                          // Disable save for Evolution / Evolution Go until the health check passes
                           ((selectedProvider?.id === 'evolution' ||
                             selectedProvider?.id === 'evolution_go') &&
                             healthCheckPassed !== true)
