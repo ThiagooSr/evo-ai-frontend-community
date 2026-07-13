@@ -1612,6 +1612,7 @@
     "deleting": "Eliminazione..."
   },
   "overview": {
+    "noIntegrationConfigured": "Nessuna integrazione configurata",
     "tabLabel": "Panoramica",
     "title": "Panoramica dei canali",
     "subtitle": "Vedi tutti i tipi di canale, il loro stato e come configurarli.",

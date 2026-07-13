@@ -1,4 +1,12 @@
-import { Button, Card, CardContent } from '@evoapi/design-system';
+import {
+  Button,
+  Card,
+  CardContent,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@evoapi/design-system';
 import { ChevronRight, Layers, Link2, Plus } from 'lucide-react';
 import { useLanguage } from '@/hooks/useLanguage';
 import { cn } from '@/utils/cn';
@@ -34,6 +42,8 @@ interface ChannelTypeCardProps {
   liveVerifiedIds?: Set<string>;
   liveLoadingIds?: Set<string>;
   liveFailedIds?: Set<string>;
+  /** When set, the connect/add action is disabled and this text is shown on hover. */
+  disabledReason?: string;
 }
 
 export default function ChannelTypeCard({
@@ -44,6 +54,7 @@ export default function ChannelTypeCard({
   liveVerifiedIds,
   liveLoadingIds,
   liveFailedIds,
+  disabledReason,
 }: ChannelTypeCardProps) {
   const { t } = useLanguage('channels');
   const { type, total, status } = typeStatus;
@@ -54,15 +65,37 @@ export default function ChannelTypeCard({
 
   // Soft green-tint action: on-brand but calm, so the page's single solid-green
   // CTA ("Novo Canal") stays the primary. Same treatment in both states.
-  const primaryAction = (
+  const actionDisabled = !!disabledReason;
+  const actionButton = (
     <Button
       variant="ghost"
-      className="w-full bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
-      onClick={() => onAdd(typeStatus)}
+      className={cn(
+        'w-full',
+        actionDisabled
+          ? 'cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground'
+          : 'bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary',
+      )}
+      disabled={actionDisabled}
+      onClick={() => !actionDisabled && onAdd(typeStatus)}
     >
       <Plus className="mr-2 h-4 w-4" />
       {isConfigured ? t('overview.actions.addConnection') : t('overview.actions.connect')}
     </Button>
+  );
+
+  // When the type has no configured integration (e.g. email with neither Gmail nor
+  // Outlook OAuth set up), disable the action and explain why on hover.
+  const primaryAction = actionDisabled ? (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-block w-full">{actionButton}</span>
+        </TooltipTrigger>
+        <TooltipContent>{disabledReason}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  ) : (
+    actionButton
   );
 
   return (

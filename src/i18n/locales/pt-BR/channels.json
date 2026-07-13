@@ -1733,6 +1733,7 @@
     "deleting": "Excluindo..."
   },
   "overview": {
+    "noIntegrationConfigured": "Nenhuma integração configurada",
     "tabLabel": "Visão geral",
     "title": "Visão geral dos canais",
     "subtitle": "Veja todos os tipos de canal, o status de cada um e como configurar.",

@@ -1733,6 +1733,7 @@
     "deleting": "Deleting..."
   },
   "overview": {
+    "noIntegrationConfigured": "No integration configured",
     "tabLabel": "Overview",
     "title": "Channel overview",
     "subtitle": "See every channel type, its status, and how to set it up.",
