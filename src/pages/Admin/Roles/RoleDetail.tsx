@@ -22,6 +22,7 @@ import {
   groupsFor,
   isHiddenAction,
   isStandaloneAction,
+  expandCoarseKeys,
   type ActionGroup,
   RESOURCE_NESTING,
 } from '@/config/permissionDomains';
@@ -198,7 +199,14 @@ export default function RoleDetail() {
         // is only ever there because the role already had it.
         return cfg !== undefined && !isKeyLocked(key, selected);
       });
-      const updated = await rolesService.bulkUpdatePermissions(role.id, knownKeys);
+      // EVO-2127: also persist the coarse read/write/delete groups the editor
+      // shows — additively (granular stays) and guarded against the live catalog
+      // so a backend without `<resource>.write` never triggers a 422.
+      const payload = expandCoarseKeys(
+        knownKeys,
+        (resource, action) => resourceActions.resources[resource]?.actions?.[action] !== undefined,
+      );
+      const updated = await rolesService.bulkUpdatePermissions(role.id, payload);
       setRole(updated);
       permissionsService.clearPermissionsCache();
       toast.success(t('messages.permissionsSuccess'));
