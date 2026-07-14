@@ -156,6 +156,9 @@ export interface ActionGroup {
 }
 
 // Reads. Everything else that is not a delete or a standalone is a write.
+// NOTE: mirrored on the backend as ResourceActionsConfig::NON_WRITE_ACTIONS —
+// keep the two in sync (a read added here must be added there, or the two
+// disagree on what a "write" is and a save 403s).
 const READ_ACTIONS = new Set([
   'read',
   'meta',
@@ -174,6 +177,13 @@ const READ_ACTIONS = new Set([
   'permissions',
   'check_permission',
   'export',
+  // View-only actions on AI/config resources (would otherwise mis-group as write).
+  'available',
+  'categories',
+  'config',
+  'access_shared',
+  'usage',
+  'metrics',
 ]);
 
 // Keys that are not CRUD at all and keep their own row.
@@ -194,6 +204,31 @@ export function groupOfAction(resourceKey: string, actionKey: string): ActionGro
   if (isStandaloneAction(resourceKey, actionKey)) return null;
   if (actionKey === 'delete') return 'delete';
   return READ_ACTIONS.has(actionKey) ? 'read' : 'write';
+}
+
+/**
+ * EVO-2127: given the granular keys about to be saved, also emit the coarse
+ * `<resource>.write` key the role editor's Write group displays — additively
+ * (the granular keys stay) and guarded (only when the catalog declares it, so a
+ * backend without `<resource>.write` never triggers a 422).
+ *
+ * Only WRITE is synthesized. Coarse `read`/`delete` are identical to their
+ * granular homonyms (`x.read` / `x.delete`), which are already in `knownKeys`
+ * whenever selected — synthesizing them would add nothing and could grant e.g.
+ * `x.read` off a sibling read action like `x.search`.
+ */
+export function expandCoarseKeys(
+  knownKeys: string[],
+  catalogHas: (resource: string, action: string) => boolean,
+): string[] {
+  const coarse = new Set<string>();
+  for (const key of knownKeys) {
+    const [resource, action] = key.split('.');
+    if (groupOfAction(resource, action) === 'write' && catalogHas(resource, 'write')) {
+      coarse.add(`${resource}.write`);
+    }
+  }
+  return Array.from(new Set([...knownKeys, ...coarse]));
 }
 
 const GROUP_ORDER: ActionGroup['key'][] = ['read', 'write', 'delete'];
