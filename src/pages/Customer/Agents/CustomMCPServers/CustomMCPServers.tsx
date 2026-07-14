@@ -307,7 +307,13 @@ export default function CustomMCPServers() {
     try {
       const result = await testCustomMcpServer(server.id);
       if (result.test_result.success) {
-        toast.success(t('success.testSuccess', { count: result.server.tools.length || 0 }));
+        // EVO-2139: prioriza `tools_count` do próprio test (número descoberto
+        // agora no handshake MCP) sobre `server.tools.length` (DB, que fica
+        // stale se o Create original não conseguiu popular). Optional-chaining
+        // no fallback evita o crash silencioso quando o server tem tools=null.
+        const count =
+          result.test_result.tools_count ?? result.server.tools?.length ?? 0;
+        toast.success(t('success.testSuccess', { count }));
         // Update server with latest tools
         setState(prev => ({
           ...prev,
