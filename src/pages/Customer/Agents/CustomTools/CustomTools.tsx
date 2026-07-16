@@ -126,7 +126,7 @@ export default function CustomTools() {
         }));
       } catch (error) {
         console.error('Error loading custom tools:', error);
-        toast.error(getErrorMessage(error as Error, t('errors.loadError')));
+        toast.error(getErrorMessage(error as Error, t('messages.loadError')));
         setState(prev => ({ ...prev, loading: { ...prev.loading, list: false } }));
       }
     },
@@ -182,7 +182,7 @@ export default function CustomTools() {
       await loadTools({ skip: 0, search: state.searchQuery }, filters);
     } catch (error) {
       console.error('Error applying filters:', error);
-      toast.error(getErrorMessage(error as Error, t('errors.applyFiltersError')));
+      toast.error(getErrorMessage(error as Error, t('messages.applyFiltersError')));
     }
   };
 
@@ -259,7 +259,7 @@ export default function CustomTools() {
       })
       .catch(err => {
         console.error('Failed to load tool for edit:', err);
-        toast.error(t('errors.loadError'));
+        toast.error(t('messages.loadError'));
         navigate('/agents/custom-tools');
       });
     return () => {
@@ -287,7 +287,7 @@ export default function CustomTools() {
       setTestResultOpen(true);
     } catch (error) {
       console.error('Error testing custom tool:', error);
-      toast.error(getErrorMessage(error as Error, t('errors.testError')));
+      toast.error(getErrorMessage(error as Error, t('messages.testError')));
     } finally {
       setTestingTool(null);
       setState(prev => ({ ...prev, loading: { ...prev.loading, test: false } }));
@@ -304,7 +304,7 @@ export default function CustomTools() {
 
     try {
       await deleteCustomTool(toolToDelete.id);
-      toast.success(t('success.deleteSuccess'));
+      toast.success(t('messages.deleteSuccess'));
 
       // Refresh the list
       loadTools();
@@ -313,7 +313,7 @@ export default function CustomTools() {
       setToolToDelete(null);
     } catch (error) {
       console.error('Error deleting custom tool:', error);
-      toast.error(t('errors.deleteError'));
+      toast.error(t('messages.deleteError'));
     } finally {
       setState(prev => ({ ...prev, loading: { ...prev.loading, delete: false } }));
     }
@@ -332,7 +332,7 @@ export default function CustomTools() {
       if (editingTool) {
         // Update existing tool
         const response = await updateCustomTool(editingTool.id, data);
-        toast.success(t('success.updateSuccess'));
+        toast.success(t('messages.updateSuccess'));
 
         // Update the specific tool in the list with the latest data
         setState(prev => ({
@@ -346,7 +346,7 @@ export default function CustomTools() {
       } else {
         // Create new tool
         await createCustomTool(data);
-        toast.success(t('success.createSuccess'));
+        toast.success(t('messages.createSuccess'));
 
         // Refresh the entire list for new tools
         loadTools();
@@ -359,7 +359,7 @@ export default function CustomTools() {
       }
     } catch (error) {
       console.error('Error saving custom tool:', error);
-      toast.error(editingTool ? t('errors.updateError') : t('errors.createError'));
+      toast.error(editingTool ? t('messages.updateError') : t('messages.createError'));
     } finally {
       setState(prev => ({
         ...prev,
