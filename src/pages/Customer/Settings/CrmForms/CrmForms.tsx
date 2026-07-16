@@ -150,7 +150,7 @@ export default function CrmForms() {
   };
 
   const copyLink = (form: CrmForm) => {
-    const url = `${window.location.origin}/f/${form.slug}`;
+    const url = `${window.location.origin}/f/${form.id}`;
     navigator.clipboard?.writeText(url);
     toast.success(t('actions.linkCopied'));
   };
@@ -254,7 +254,7 @@ export default function CrmForms() {
                         onClick={() => copyLink(form)}
                         className="inline-flex items-center gap-1 text-sidebar-foreground/60 hover:text-sidebar-foreground"
                       >
-                        <Copy className="w-3.5 h-3.5" /> /f/{form.slug}
+                        <Copy className="w-3.5 h-3.5" /> /f/{form.id}
                       </button>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">

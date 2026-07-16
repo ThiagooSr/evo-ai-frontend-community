@@ -1,6 +1,5 @@
 import {
   Plus,
-  Download,
   Key,
   Trash2,
 } from 'lucide-react';
@@ -14,7 +13,6 @@ interface AgentsHeaderProps {
   searchValue: string;
   onSearchChange: (value: string) => void;
   onNewAgent: () => void;
-  onExport: () => void;
   onManageApiKeys: () => void;
   onBulkDelete: () => void;
   onClearSelection: () => void;
@@ -29,7 +27,6 @@ export default function AgentsHeader({
   searchValue,
   onSearchChange,
   onNewAgent,
-  onExport,
   onManageApiKeys,
   onBulkDelete,
   onClearSelection,
@@ -54,12 +51,6 @@ export default function AgentsHeader({
       onClick: onManageApiKeys,
       variant: 'outline' as const,
       dataTour: 'agents-api-keys',
-    },
-    {
-      label: t('export.all'),
-      icon: <Download className="h-4 w-4" />,
-      onClick: onExport,
-      variant: 'outline' as const,
     },
   ];
 
