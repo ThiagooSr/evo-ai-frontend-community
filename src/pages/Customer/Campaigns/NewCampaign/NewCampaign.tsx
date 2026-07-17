@@ -332,7 +332,8 @@ export default function NewCampaign() {
         title: wizardData.name,
         description: wizardData.description,
         type: wizardData.type as CampaignType,
-        channel_type: wizardData.channel_type as CampaignChannelType,
+        // Same class of bug as sendToAll/tags/inboxId above: DTO is camelCase.
+        channelType: wizardData.channel_type as CampaignChannelType,
         status: wizardData.type === CampaignType.TRIGGER
           ? CampaignStatus.SCHEDULED // Trigger campaigns start as SCHEDULED until event fires
           : wizardData.schedule_option === 'now' 
@@ -473,7 +474,21 @@ export default function NewCampaign() {
         await campaignsService.updateCampaign(campaignId, campaignData as any);
         toast.success(t('messages.updateSuccess'), { id: toastId });
       } else {
-        await campaignsService.createCampaign(campaignData as any);
+        const createdCampaign = await campaignsService.createCampaign(campaignData as any);
+
+        // template_ids has no home in CreateCampaignDto — templates are
+        // associated one at a time via a dedicated endpoint
+        // (POST /campaigns/:id/templates). Without this call the campaign
+        // is created with zero templates and campaign-sender has nothing to
+        // dispatch. Edit-mode template changes aren't reconciled here yet
+        // (would need to diff against existing CampaignTemplate rows to
+        // avoid duplicating associations on every save) — known gap.
+        const templateIds = wizardData.template_ids || [];
+        for (let i = 0; i < templateIds.length; i++) {
+          const variant = templateIds.length > 1 ? String.fromCharCode(65 + i) : undefined;
+          await campaignsService.addCampaignTemplate(createdCampaign.id, templateIds[i], variant);
+        }
+
         toast.success(t('messages.createSuccess'), { id: toastId });
       }
     } catch (error) {
