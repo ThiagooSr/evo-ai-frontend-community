@@ -324,7 +324,13 @@ export default function NewCampaign() {
             : undefined,
 
         // Inbox (apenas 1)
-        inbox_id: wizardData.inbox_id,
+        // evo-flow's CreateCampaignDto is camelCase and ValidationPipe uses
+        // whitelist:true — any snake_case key here is silently dropped
+        // instead of erroring, so a naming mismatch never surfaces as a bug
+        // report until someone notices the campaign behaving as if the field
+        // was never set (EVO analysis 2026-07-17: this is what made every
+        // tag-targeted campaign silently fall back to "send to all").
+        inboxId: wizardData.inbox_id,
 
         // Templates
         template_ids: wizardData.template_ids,
@@ -384,9 +390,14 @@ export default function NewCampaign() {
           : undefined,
 
         // Contacts
-        send_to_all: wizardData.contact_selection === 'all',
+        // sendToAll/tags must match evo-flow's CreateCampaignDto exactly (see
+        // note on inboxId above). segment_ids has no DTO counterpart at all
+        // yet — direct segment-based audience selection at creation time is
+        // a separate, still-unimplemented gap (trigger campaigns can target
+        // a segment via triggerConfig.segment_id, but that's a different path).
+        sendToAll: wizardData.contact_selection === 'all',
         segment_ids: wizardData.segment_ids,
-        tag_ids: wizardData.tag_ids,
+        tags: wizardData.tag_ids,
         steps: {
           ...existingSteps,
           wizard_state: wizardState,
