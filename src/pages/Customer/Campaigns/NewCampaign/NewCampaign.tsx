@@ -4,6 +4,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CampaignType, CampaignChannelType, CampaignStatus } from '@/types/campaigns';
 import { campaignsService } from '@/services/campaigns';
+import { labelsService } from '@/services/contacts/labelsService';
 
 // Wizard components - 5 PASSOS
 import WizardProgress from './wizard/WizardProgress';
@@ -272,6 +273,26 @@ export default function NewCampaign() {
     const toastId = toast.loading(isEditMode ? t('loading.updating') : t('loading.creating'));
 
     try {
+      // evo-flow's SegmentQueryBuilderService#getContactsByTags matches by
+      // `tag.name` (evo-flow's local tags table, synced from CRM via label
+      // events, has no relationship to CRM's label UUIDs — its own `id` is
+      // freshly generated per row). wizardData.tag_ids holds CRM label UUIDs
+      // (plus `!id`-prefixed exclusions the backend doesn't support), so it
+      // must be resolved to label titles here or the tag filter silently
+      // matches zero contacts. Only plain inclusions are resolved; exclusion
+      // filtering isn't implemented on the backend yet.
+      let resolvedTagNames: string[] = [];
+      if (wizardData.contact_selection === 'tags' && (wizardData.tag_ids?.length ?? 0) > 0) {
+        const includedTagIds = (wizardData.tag_ids || []).filter(id => !id.startsWith('!'));
+        if (includedTagIds.length > 0) {
+          const labelsRes = await labelsService.getLabels({ per_page: 200 });
+          const allLabels = labelsRes.data || [];
+          resolvedTagNames = includedTagIds
+            .map(id => allLabels.find(l => l.id === id)?.title)
+            .filter((title): title is string => Boolean(title));
+        }
+      }
+
       // Build campaign data
       const wizardState = {
         name: wizardData.name,
@@ -397,7 +418,7 @@ export default function NewCampaign() {
         // a segment via triggerConfig.segment_id, but that's a different path).
         sendToAll: wizardData.contact_selection === 'all',
         segment_ids: wizardData.segment_ids,
-        tags: wizardData.tag_ids,
+        tags: resolvedTagNames,
         steps: {
           ...existingSteps,
           wizard_state: wizardState,
