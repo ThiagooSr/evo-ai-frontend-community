@@ -328,7 +328,10 @@ export default function NewCampaign() {
       };
 
       const campaignData = {
-        name: currentCampaignName || wizardData.name.toLowerCase().replace(/\s+/g, '_'),
+        // Backend's `campaigns.name` column is varchar(40) - untruncated slugs from
+        // longer titles blew past that and crashed the INSERT (QueryFailedError:
+        // value too long for type character varying(40)).
+        name: currentCampaignName || wizardData.name.toLowerCase().replace(/\s+/g, '_').slice(0, 40),
         title: wizardData.name,
         description: wizardData.description,
         type: wizardData.type as CampaignType,
