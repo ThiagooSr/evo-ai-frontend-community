@@ -457,6 +457,7 @@ const ChatArea = ({
               selectedConversation?.additional_attributes?.post_data as PostData | undefined
             }
             messageModerations={messageModerationsMap}
+            conversationId={selectedConversationId}
             onLoadMore={handleLoadMore}
             onRetryMessage={handleRetryMessage}
             onReplyToMessage={handleReplyToMessage}

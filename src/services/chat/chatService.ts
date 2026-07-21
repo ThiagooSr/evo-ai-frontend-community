@@ -279,6 +279,14 @@ class ChatService {
     });
   }
 
+  // Resolves a single message the client doesn't have loaded yet - used by
+  // the reply preview to show real content/scroll to a quoted message that
+  // sits outside the currently paginated window.
+  async getMessage(conversationId: string, messageId: string): Promise<Message> {
+    const response = await api.get(`/conversations/${conversationId}/messages/${messageId}`);
+    return extractData<Message>(response);
+  }
+
   async updateMessage(
     conversationId: string,
     messageId: string,
