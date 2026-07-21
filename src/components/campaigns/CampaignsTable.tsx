@@ -175,7 +175,7 @@ export default function CampaignsTable({
       sortable: true,
       render: campaign => (
         <div className="text-sm">
-          {formatDate(campaign.createdAt)}
+          {formatDate(campaign.createdAt || campaign.created_at)}
           {campaign.scheduleTo && (
             <div className="text-xs text-muted-foreground">
               {t('table.scheduled')}: {formatDate(campaign.scheduleTo)}
