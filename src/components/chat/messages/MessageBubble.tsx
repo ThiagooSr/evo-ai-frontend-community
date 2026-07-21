@@ -102,39 +102,44 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   // shared across bubbles) cache populated by that fetch.
   const [fetchedReplyTick, setFetchedReplyTick] = useState(0);
 
+  // Whichever reference the message actually carries - an inbound WhatsApp
+  // reply quotes the OTHER party's WhatsApp message id (in_reply_to_external_id,
+  // never our internal id), while in_reply_to is our own id. The backend's
+  // GET .../messages/:id resolves either (falls back to source_id when :id
+  // isn't a UUID), so one lookup id covers both cases.
+  const replyLookupId = replyToMessageId || replyToExternalId;
+
   const replyToMessage = useMemo(() => {
     if (!hasReplyReference) return null;
     if (replyToMessageId) {
       const local = allMessages.find(msg => String(msg.id) === String(replyToMessageId));
       if (local) return local;
-      return getCachedReplyMessage(String(replyToMessageId)) ?? null;
     }
     if (replyToExternalId) {
-      // No lookup-by-external-id endpoint exists yet - only resolves when
-      // the target happens to already be in the loaded page.
-      return allMessages.find(
+      const local = allMessages.find(
         msg => msg.source_id && String(msg.source_id) === String(replyToExternalId),
-      ) ?? null;
+      );
+      if (local) return local;
     }
-    return null;
+    return replyLookupId ? (getCachedReplyMessage(String(replyLookupId)) ?? null) : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchedReplyTick exists only to re-run this memo after a cache write
-  }, [hasReplyReference, replyToMessageId, replyToExternalId, allMessages, fetchedReplyTick]);
+  }, [hasReplyReference, replyToMessageId, replyToExternalId, replyLookupId, allMessages, fetchedReplyTick]);
 
   // The quoted message wasn't in the currently loaded page - fetch it directly
   // so the preview shows real content instead of the generic "Mensagem
   // anterior" fallback (EVO reply-jump fix).
   useEffect(() => {
-    if (!replyToMessageId || replyToMessage || !conversationId) return;
+    if (!replyLookupId || replyToMessage || !conversationId) return;
 
     let cancelled = false;
-    fetchReplyMessage(conversationId, String(replyToMessageId)).then(fetched => {
+    fetchReplyMessage(conversationId, String(replyLookupId)).then(fetched => {
       if (!cancelled && fetched) setFetchedReplyTick(tick => tick + 1);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [replyToMessageId, replyToMessage, conversationId]);
+  }, [replyLookupId, replyToMessage, conversationId]);
 
   const handleCopyMessage = () => {
     if (message.content) {
