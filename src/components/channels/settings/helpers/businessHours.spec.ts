@@ -26,8 +26,8 @@ describe('businessHours — lunch break', () => {
       const [monday] = timeSlotParse(slots);
 
       expect(monday.hasBreak).toBe(false);
-      expect(monday.from).toBe('09:00 AM');
-      expect(monday.to).toBe('05:00 PM');
+      expect(monday.from).toBe('09:00');
+      expect(monday.to).toBe('17:00');
     });
 
     it('parses a day with a second slot into a break window', () => {
@@ -50,17 +50,17 @@ describe('businessHours — lunch break', () => {
       const [monday] = timeSlotParse(slots);
 
       expect(monday.hasBreak).toBe(true);
-      expect(monday.from).toBe('09:00 AM');
-      expect(monday.to).toBe('06:00 PM');
-      expect(monday.breakFrom).toBe('12:00 PM');
-      expect(monday.breakTo).toBe('01:00 PM');
+      expect(monday.from).toBe('09:00');
+      expect(monday.to).toBe('18:00');
+      expect(monday.breakFrom).toBe('12:00');
+      expect(monday.breakTo).toBe('13:00');
       expect(monday.breakValid).toBe(true);
     });
   });
 
   describe('timeSlotTransform', () => {
     it('sends null for the second slot when there is no break', () => {
-      const slots: TimeSlot[] = [{ day: 1, from: '09:00 AM', to: '05:00 PM', valid: true }];
+      const slots: TimeSlot[] = [{ day: 1, from: '09:00', to: '17:00', valid: true }];
 
       const [monday] = timeSlotTransform(slots);
 
@@ -74,12 +74,12 @@ describe('businessHours — lunch break', () => {
       const slots: TimeSlot[] = [
         {
           day: 1,
-          from: '09:00 AM',
-          to: '06:00 PM',
+          from: '09:00',
+          to: '18:00',
           valid: true,
           hasBreak: true,
-          breakFrom: '12:00 PM',
-          breakTo: '01:00 PM',
+          breakFrom: '12:00',
+          breakTo: '13:00',
           breakValid: true,
         },
       ];
@@ -118,8 +118,8 @@ describe('businessHours — lunch break', () => {
       const slots: TimeSlot[] = [
         {
           day: 1,
-          from: '09:00 AM',
-          to: '06:00 PM',
+          from: '09:00',
+          to: '18:00',
           valid: true,
           hasBreak: false,
         },
@@ -136,23 +136,23 @@ describe('businessHours — lunch break', () => {
 
   describe('validateBreakSlot', () => {
     it('accepts a break fully inside the day, in order', () => {
-      expect(validateBreakSlot('09:00 AM', '12:00 PM', '01:00 PM', '06:00 PM')).toBe(true);
+      expect(validateBreakSlot('09:00', '12:00', '13:00', '18:00')).toBe(true);
     });
 
     it('rejects a break starting before the day starts', () => {
-      expect(validateBreakSlot('09:00 AM', '08:00 AM', '01:00 PM', '06:00 PM')).toBe(false);
+      expect(validateBreakSlot('09:00', '08:00', '13:00', '18:00')).toBe(false);
     });
 
     it('rejects a break ending after the day ends', () => {
-      expect(validateBreakSlot('09:00 AM', '05:00 PM', '07:00 PM', '06:00 PM')).toBe(false);
+      expect(validateBreakSlot('09:00', '17:00', '19:00', '18:00')).toBe(false);
     });
 
     it('rejects a break where the end is before the start', () => {
-      expect(validateBreakSlot('09:00 AM', '01:00 PM', '12:00 PM', '06:00 PM')).toBe(false);
+      expect(validateBreakSlot('09:00', '13:00', '12:00', '18:00')).toBe(false);
     });
 
     it('rejects an incomplete break', () => {
-      expect(validateBreakSlot('09:00 AM', '12:00 PM', undefined, '06:00 PM')).toBe(false);
+      expect(validateBreakSlot('09:00', '12:00', undefined, '18:00')).toBe(false);
     });
   });
 
@@ -160,12 +160,12 @@ describe('businessHours — lunch break', () => {
     it('subtracts the break duration from the total', () => {
       const slot: TimeSlot = {
         day: 1,
-        from: '09:00 AM',
-        to: '06:00 PM',
+        from: '09:00',
+        to: '18:00',
         valid: true,
         hasBreak: true,
-        breakFrom: '12:00 PM',
-        breakTo: '01:00 PM',
+        breakFrom: '12:00',
+        breakTo: '13:00',
         breakValid: true,
       };
 
@@ -176,12 +176,12 @@ describe('businessHours — lunch break', () => {
     it('does not subtract an invalid break', () => {
       const slot: TimeSlot = {
         day: 1,
-        from: '09:00 AM',
-        to: '06:00 PM',
+        from: '09:00',
+        to: '18:00',
         valid: true,
         hasBreak: true,
-        breakFrom: '12:00 PM',
-        breakTo: '01:00 PM',
+        breakFrom: '12:00',
+        breakTo: '13:00',
         breakValid: false,
       };
 

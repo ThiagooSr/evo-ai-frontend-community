@@ -60,32 +60,24 @@ export const getDayNames = (): Record<number, string> => ({
   6: i18n.t('channels:settings.businessHours.days.saturday'),
 });
 
-// Generate time slots with specified step (in minutes)
+// Generate time slots (24h format, e.g. "08:00", "13:30") with specified step (in minutes)
 export const generateTimeSlots = (step = 30): string[] => {
-  const date = new Date(1970, 1, 1);
   const slots: string[] = [];
 
-  while (date.getDate() === 1) {
-    slots.push(
-      date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      }),
-    );
-    date.setMinutes(date.getMinutes() + step);
+  for (let minutes = 0; minutes < 24 * 60; minutes += step) {
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    slots.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
   }
 
   return slots;
 };
 
-// Convert hour and minute to time string
+// Convert hour and minute to a 24h time string (e.g. "08:00", "17:30")
 export const getTime = (hour: number, minute: number): string => {
-  const meridian = hour > 11 ? 'PM' : 'AM';
-  const modHour = hour > 12 ? hour % 12 : hour || 12;
-  const parsedHour = modHour < 10 ? `0${modHour}` : modHour;
-  const parsedMinute = minute < 10 ? `0${minute}` : minute;
-  return `${parsedHour}:${parsedMinute} ${meridian}`;
+  const parsedHour = hour < 10 ? `0${hour}` : `${hour}`;
+  const parsedMinute = minute < 10 ? `0${minute}` : `${minute}`;
+  return `${parsedHour}:${parsedMinute}`;
 };
 
 // Parse business hours from API format to UI format
@@ -144,21 +136,21 @@ export const timeSlotTransform = (timeSlots: TimeSlot[]): BusinessHourSlot[] => 
     let closeMinutes2: number | null = null;
 
     if (!closed && slot.from && slot.to) {
-      openHour = getHours(parse(slot.from, 'hh:mm a', new Date()));
-      openMinutes = getMinutes(parse(slot.from, 'hh:mm a', new Date()));
+      openHour = getHours(parse(slot.from, 'HH:mm', new Date()));
+      openMinutes = getMinutes(parse(slot.from, 'HH:mm', new Date()));
 
       if (hasBreak && slot.breakFrom && slot.breakTo) {
         // close_* marks the START of the break; open_*_2/close_*_2 is the afternoon
         // stretch that ends at the day's real "to".
-        closeHour = getHours(parse(slot.breakFrom, 'hh:mm a', new Date()));
-        closeMinutes = getMinutes(parse(slot.breakFrom, 'hh:mm a', new Date()));
-        openHour2 = getHours(parse(slot.breakTo, 'hh:mm a', new Date()));
-        openMinutes2 = getMinutes(parse(slot.breakTo, 'hh:mm a', new Date()));
-        closeHour2 = getHours(parse(slot.to, 'hh:mm a', new Date()));
-        closeMinutes2 = getMinutes(parse(slot.to, 'hh:mm a', new Date()));
+        closeHour = getHours(parse(slot.breakFrom, 'HH:mm', new Date()));
+        closeMinutes = getMinutes(parse(slot.breakFrom, 'HH:mm', new Date()));
+        openHour2 = getHours(parse(slot.breakTo, 'HH:mm', new Date()));
+        openMinutes2 = getMinutes(parse(slot.breakTo, 'HH:mm', new Date()));
+        closeHour2 = getHours(parse(slot.to, 'HH:mm', new Date()));
+        closeMinutes2 = getMinutes(parse(slot.to, 'HH:mm', new Date()));
       } else {
-        closeHour = getHours(parse(slot.to, 'hh:mm a', new Date()));
-        closeMinutes = getMinutes(parse(slot.to, 'hh:mm a', new Date()));
+        closeHour = getHours(parse(slot.to, 'HH:mm', new Date()));
+        closeMinutes = getMinutes(parse(slot.to, 'HH:mm', new Date()));
       }
     }
 
@@ -183,11 +175,11 @@ export const validateTimeSlot = (from: string, to: string): boolean => {
   if (!from || !to) return false;
 
   try {
-    const fromDate = parse(from, 'hh:mm a', new Date());
-    const toDate = parse(to, 'hh:mm a', new Date());
+    const fromDate = parse(from, 'HH:mm', new Date());
+    const toDate = parse(to, 'HH:mm', new Date());
 
     // Special case for midnight (next day)
-    if (to === '12:00 AM') return true;
+    if (to === '00:00') return true;
 
     return differenceInMinutes(toDate, fromDate) > 0;
   } catch {
@@ -201,10 +193,10 @@ export const validateBreakSlot = (from?: string, breakFrom?: string, breakTo?: s
   if (!validateTimeSlot(breakFrom, breakTo)) return false;
 
   try {
-    const fromDate = parse(from, 'hh:mm a', new Date());
-    const breakFromDate = parse(breakFrom, 'hh:mm a', new Date());
-    const breakToDate = parse(breakTo, 'hh:mm a', new Date());
-    const toDate = to === '12:00 AM' ? parse('11:59 PM', 'hh:mm a', new Date()) : parse(to, 'hh:mm a', new Date());
+    const fromDate = parse(from, 'HH:mm', new Date());
+    const breakFromDate = parse(breakFrom, 'HH:mm', new Date());
+    const breakToDate = parse(breakTo, 'HH:mm', new Date());
+    const toDate = to === '00:00' ? parse('23:59', 'HH:mm', new Date()) : parse(to, 'HH:mm', new Date());
 
     return differenceInMinutes(breakFromDate, fromDate) > 0 && differenceInMinutes(toDate, breakToDate) > 0;
   } catch {
@@ -219,12 +211,12 @@ export const calculateTotalHours = (timeSlot: TimeSlot): number => {
   if (!timeSlot.from || !timeSlot.to || !timeSlot.valid) return 0;
 
   try {
-    const fromDate = parse(timeSlot.from, 'hh:mm a', new Date());
-    const toDate = parse(timeSlot.to, 'hh:mm a', new Date());
+    const fromDate = parse(timeSlot.from, 'HH:mm', new Date());
+    const toDate = parse(timeSlot.to, 'HH:mm', new Date());
 
     let totalMinutes: number;
     // Handle midnight as next day
-    if (timeSlot.to === '12:00 AM') {
+    if (timeSlot.to === '00:00') {
       const nextDayMidnight = new Date(toDate);
       nextDayMidnight.setDate(nextDayMidnight.getDate() + 1);
       totalMinutes = differenceInMinutes(nextDayMidnight, fromDate);
@@ -233,8 +225,8 @@ export const calculateTotalHours = (timeSlot: TimeSlot): number => {
     }
 
     if (timeSlot.hasBreak && timeSlot.breakValid && timeSlot.breakFrom && timeSlot.breakTo) {
-      const breakFromDate = parse(timeSlot.breakFrom, 'hh:mm a', new Date());
-      const breakToDate = parse(timeSlot.breakTo, 'hh:mm a', new Date());
+      const breakFromDate = parse(timeSlot.breakFrom, 'HH:mm', new Date());
+      const breakToDate = parse(timeSlot.breakTo, 'HH:mm', new Date());
       totalMinutes -= Math.max(0, differenceInMinutes(breakToDate, breakFromDate));
     }
 
