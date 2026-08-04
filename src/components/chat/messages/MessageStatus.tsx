@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Message } from '@/types/chat/api';
 import { formatMessageTime } from '@/utils/time/timeHelpers';
 import { useLanguage } from '@/hooks/useLanguage';
+import { getFriendlyDeliveryError } from './utils/deliveryErrorMessages';
 
 interface MessageStatusProps {
   message: Message;
@@ -47,11 +48,19 @@ const MessageStatus: React.FC<MessageStatusProps> = ({ message, isOwn, onRetry, 
         return <Loader2 className="h-3 w-3 text-blue-500 animate-spin" />;
       case 'failed': {
         // The backend already captures the real provider error (e.g. "131026: Message
-        // undeliverable") in content_attributes.external_error — show it directly
-        // instead of a generic "status unavailable" label, so agents can tell a
-        // real delivery failure (bad number, 24h window, etc.) from a retry-worthy
-        // one without having to ask engineering.
+        // undeliverable") in content_attributes.external_error. A raw error code means
+        // nothing to a non-technical agent, so translate the ones we recognize into
+        // plain language and show THAT as the label — the raw code stays available in
+        // the tooltip for anyone who wants the technical detail.
         const externalError = message.content_attributes?.external_error;
+        const friendlyError = getFriendlyDeliveryError(externalError);
+        const displayText = friendlyError || externalError || t('messages.messageStatus.tryAgain');
+        const titleText = externalError
+          ? friendlyError
+            ? `${friendlyError} (${externalError})`
+            : `${t('messages.messageStatus.sendFailed')}: ${externalError}`
+          : t('messages.messageStatus.sendFailed');
+
         return (
           <Button
             size="sm"
@@ -64,10 +73,10 @@ const MessageStatus: React.FC<MessageStatusProps> = ({ message, isOwn, onRetry, 
                 toast.error(t('messages.messageStatus.retryInDevelopment'));
               }
             }}
-            title={externalError ? `${t('messages.messageStatus.sendFailed')}: ${externalError}` : t('messages.messageStatus.sendFailed')}
+            title={titleText}
           >
             <AlertCircle className="h-3 w-3 flex-shrink-0" />
-            <span className="ml-1 text-xs truncate">{externalError || t('messages.messageStatus.tryAgain')}</span>
+            <span className="ml-1 text-xs truncate">{displayText}</span>
           </Button>
         );
       }

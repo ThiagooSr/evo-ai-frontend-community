@@ -27,7 +27,7 @@ const mockMessage = (overrides: Partial<Message> = {}): Message =>
 // content_attributes.external_error. Agents had no way to tell a bad phone
 // number apart from a retry-worthy transient failure without asking engineering.
 describe('MessageStatus — failed messages', () => {
-  it('shows the real provider error inline when content_attributes.external_error is present', () => {
+  it('shows a plain-language explanation for a recognized error code, not the raw code', () => {
     render(
       <MessageStatus
         message={mockMessage({ content_attributes: { external_error: '131026: Message undeliverable' } })}
@@ -35,7 +35,19 @@ describe('MessageStatus — failed messages', () => {
       />,
     );
 
-    expect(screen.getByText('131026: Message undeliverable')).toBeInTheDocument();
+    expect(screen.getByText('O número não tem WhatsApp ativo ou não pôde ser alcançado.')).toBeInTheDocument();
+    expect(screen.queryByText('131026: Message undeliverable')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the raw error text when the error is not one we recognize', () => {
+    render(
+      <MessageStatus
+        message={mockMessage({ content_attributes: { external_error: '999999: Some brand-new error' } })}
+        isOwn={true}
+      />,
+    );
+
+    expect(screen.getByText('999999: Some brand-new error')).toBeInTheDocument();
   });
 
   it('falls back to the generic retry label when no external_error was captured', () => {
@@ -52,7 +64,7 @@ describe('MessageStatus — failed messages', () => {
       />,
     );
 
-    expect(screen.queryByText('131026: Message undeliverable')).not.toBeInTheDocument();
+    expect(screen.queryByText('O número não tem WhatsApp ativo ou não pôde ser alcançado.')).not.toBeInTheDocument();
     expect(container.querySelector('button')).not.toBeInTheDocument();
   });
 });
