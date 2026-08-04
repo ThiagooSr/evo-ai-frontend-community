@@ -14,7 +14,7 @@ export default function BusinessDay({ dayName, timeSlot, onUpdate }: BusinessDay
   const { t } = useLanguage('channels');
   // Generate time slots
   const fromTimeSlots = useMemo(() => generateTimeSlots(30), []);
-  const toTimeSlots = useMemo(() => fromTimeSlots.filter(slot => slot !== '12:00 AM'), [fromTimeSlots]);
+  const toTimeSlots = useMemo(() => fromTimeSlots.filter(slot => slot !== '00:00'), [fromTimeSlots]);
 
   const isDayEnabled = Boolean(timeSlot.from && timeSlot.to);
   const hasError = !timeSlot.valid && isDayEnabled;
@@ -23,11 +23,11 @@ export default function BusinessDay({ dayName, timeSlot, onUpdate }: BusinessDay
 
   const handleDayToggle = (checked: boolean) => {
     if (checked) {
-      // Enable day with default hours (9 AM to 5 PM)
+      // Enable day with default hours (09:00 to 17:00)
       onUpdate({
         ...timeSlot,
-        from: '09:00 AM',
-        to: '05:00 PM',
+        from: '09:00',
+        to: '17:00',
         valid: true,
         openAllDay: false,
       });
@@ -48,8 +48,8 @@ export default function BusinessDay({ dayName, timeSlot, onUpdate }: BusinessDay
       // Set to 24 hours — a full day has no lunch break to configure
       onUpdate({
         ...timeSlot,
-        from: '12:00 AM',
-        to: '11:59 PM',
+        from: '00:00',
+        to: '23:59',
         valid: true,
         openAllDay: true,
         hasBreak: false,
@@ -61,8 +61,8 @@ export default function BusinessDay({ dayName, timeSlot, onUpdate }: BusinessDay
       // Set to default business hours
       onUpdate({
         ...timeSlot,
-        from: '09:00 AM',
-        to: '05:00 PM',
+        from: '09:00',
+        to: '17:00',
         valid: true,
         openAllDay: false,
       });
