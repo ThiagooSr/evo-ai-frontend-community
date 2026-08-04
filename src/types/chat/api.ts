@@ -201,6 +201,9 @@ export interface MessageContentAttributes extends Record<string, unknown> {
   is_unsupported?: boolean;
   deleted?: boolean;
   external_created_at?: number;
+  // Real provider error captured when status is 'failed' (e.g. "131026: Message
+  // undeliverable") — shown directly in MessageStatus instead of a generic label.
+  external_error?: string;
 }
 
 // ===== MESSAGE =====

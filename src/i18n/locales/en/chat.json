@@ -87,12 +87,6 @@
       "openInMaps": "Open in Google Maps"
     },
     "messageStatus": {
-      "statusUnavailable": "Message status unavailable",
-      "statusUnavailableDescription": "The message was sent, but we could not confirm the delivery status.",
-      "checkChannelConfig": "Check channel configuration",
-      "webhookIssue": "The webhook may be outdated or inactive.",
-      "deliveryStatusUnavailable": "Delivery status unavailable - Click for more details",
-      "statusUnavailableText": "Status unavailable",
       "retryInDevelopment": "Retry functionality in development",
       "sendFailed": "Send failed - Click to try again",
       "tryAgain": "Try again"
