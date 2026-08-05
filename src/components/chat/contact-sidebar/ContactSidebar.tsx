@@ -280,7 +280,11 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
       `}
         style={{
           top: isMobile ? 'var(--header-height, 60px)' : 'auto',
-          height: isMobile ? 'calc(100vh - var(--header-height, 60px))' : '100%',
+          // dvh (not vh): this is `fixed`, so a plain 100vh here is computed from the
+          // layout viewport, which mobile browsers make taller than what's actually
+          // visible whenever their address bar is showing — pushing this drawer's
+          // bottom edge past the visible screen. dvh tracks the real visible height.
+          height: isMobile ? 'calc(100dvh - var(--header-height, 60px))' : '100%',
         }}
       >
         {/* Header com Avatar e Info Básica + Close Button */}
