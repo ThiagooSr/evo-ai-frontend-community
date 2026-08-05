@@ -682,6 +682,16 @@ const ChatSidebar = ({
     };
 
     return [...filtered].sort((a, b) => {
+      // Não lida sempre no topo: sem isto, uma conversa lida uma vez e depois
+      // "parada" (sem atividade nova) afunda na lista conforme outras conversas
+      // recebem mensagens novas e sobem por cima dela pelo timestamp — mesmo
+      // que ela ainda tenha mensagem não lida esperando resposta.
+      const aUnread = (conversations.getUnreadCount(a.id) ?? a.unread_count ?? 0) > 0;
+      const bUnread = (conversations.getUnreadCount(b.id) ?? b.unread_count ?? 0) > 0;
+      if (aUnread !== bUnread) {
+        return aUnread ? -1 : 1;
+      }
+
       const aPinned = Boolean(a.custom_attributes?.pinned);
       const bPinned = Boolean(b.custom_attributes?.pinned);
       if (aPinned !== bPinned) {
@@ -689,7 +699,13 @@ const ChatSidebar = ({
       }
       return getSortTimestamp(b) - getSortTimestamp(a);
     });
-  }, [conversations.state.conversations, activeTab]);
+    // getUnreadCount is memoized against state.unreadCounts in ConversationsContext
+    // (new reference only when unread counts actually change), so depending on it
+    // here — instead of the whole `conversations` context value, which is a plain
+    // object literal re-created every provider render — keeps this sort from
+    // re-running on unrelated re-renders while still re-sorting live when a
+    // conversation is read/marked unread.
+  }, [conversations.state.conversations, conversations.getUnreadCount, activeTab]);
 
   const stripHtml = (html: string): string => {
     if (!html) return '';
