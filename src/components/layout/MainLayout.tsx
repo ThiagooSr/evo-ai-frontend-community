@@ -22,7 +22,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '@/contexts/PermissionsContext';
 import { useMenuState } from '@/hooks/useMenuState';
 import { useDashboardApps } from '@/hooks/useDashboardApps';
-import { useVisualViewportHeight } from '@/hooks/useVisualViewportHeight';
+import { useVisualViewportBounds } from '@/hooks/useVisualViewportBounds';
 import { injectDashboardAppsIntoMenu } from '@/utils/injectDashboardApps';
 import { WelcomeTourModal } from '@/components/WelcomeTourModal';
 
@@ -81,11 +81,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
   // Use the custom menu state hook
   const menuState = useMenuState(menuItems, setIsMobileMenuOpen);
 
-  // Tracks the real visible viewport height so the app shell shrinks above an open
-  // mobile keyboard instead of the composer at the bottom getting covered by it.
-  // Falls back to the `h-dvh` class (via the null check below) where the API isn't
-  // available — see useVisualViewportHeight for why h-dvh alone isn't enough.
-  const viewportHeight = useVisualViewportHeight();
+  // Tracks the real visible viewport (height + offsetTop) so the app shell shrinks
+  // and stays pinned above an open mobile keyboard instead of the composer at the
+  // bottom getting covered by it. Falls back to the `h-dvh` class (via the null
+  // check below) where the API isn't available — see useVisualViewportBounds for
+  // why height alone isn't enough on iOS Safari.
+  const viewportBounds = useVisualViewportBounds();
 
   const handleLogout = async () => {
     setLogoutDialogOpen(false);
@@ -116,7 +117,22 @@ export default function MainLayout({ children }: MainLayoutProps) {
   return (
     <div
       className="flex flex-col h-dvh bg-background transition-colors duration-150 ease-in-out"
-      style={viewportHeight != null ? { height: `${viewportHeight}px` } : undefined}
+      // `position: fixed` pinned to the visual viewport's own offsetTop takes the
+      // shell out of normal document flow — so iOS Safari's native "scroll the
+      // page to bring the focused input into view" behavior has nothing left to
+      // scroll, and can't drag the shell (and the composer inside it) out of the
+      // visible area independently of the height we already track.
+      style={
+        viewportBounds != null
+          ? {
+              position: 'fixed',
+              top: viewportBounds.offsetTop,
+              left: 0,
+              width: '100%',
+              height: `${viewportBounds.height}px`,
+            }
+          : undefined
+      }
     >
 
       {/* Header */}
