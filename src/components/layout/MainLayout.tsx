@@ -22,6 +22,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '@/contexts/PermissionsContext';
 import { useMenuState } from '@/hooks/useMenuState';
 import { useDashboardApps } from '@/hooks/useDashboardApps';
+import { useVisualViewportHeight } from '@/hooks/useVisualViewportHeight';
 import { injectDashboardAppsIntoMenu } from '@/utils/injectDashboardApps';
 import { WelcomeTourModal } from '@/components/WelcomeTourModal';
 
@@ -80,6 +81,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
   // Use the custom menu state hook
   const menuState = useMenuState(menuItems, setIsMobileMenuOpen);
 
+  // Tracks the real visible viewport height so the app shell shrinks above an open
+  // mobile keyboard instead of the composer at the bottom getting covered by it.
+  // Falls back to the `h-dvh` class (via the null check below) where the API isn't
+  // available — see useVisualViewportHeight for why h-dvh alone isn't enough.
+  const viewportHeight = useVisualViewportHeight();
+
   const handleLogout = async () => {
     setLogoutDialogOpen(false);
 
@@ -107,7 +114,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }
 
   return (
-    <div className="flex flex-col h-dvh bg-background transition-colors duration-150 ease-in-out">
+    <div
+      className="flex flex-col h-dvh bg-background transition-colors duration-150 ease-in-out"
+      style={viewportHeight != null ? { height: `${viewportHeight}px` } : undefined}
+    >
 
       {/* Header */}
       <Header
