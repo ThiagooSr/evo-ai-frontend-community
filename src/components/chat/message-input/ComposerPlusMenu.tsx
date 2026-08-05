@@ -7,6 +7,10 @@ import {
   StickyNote,
   CalendarClock,
   LayoutTemplate,
+  Smile,
+  Zap,
+  PenLine,
+  Sparkles,
 } from 'lucide-react';
 
 import { useLanguage } from '@/hooks/useLanguage';
@@ -27,6 +31,18 @@ interface ComposerPlusMenuProps {
   onSchedule: () => void;
   /** WhatsApp Cloud templates — sem equivalente no protótipo, mantido como 6º item quando disponível. */
   onOpenTemplates?: () => void;
+  /**
+   * Emoji/Macros/Assinatura/IA dobram pra dentro deste menu só no mobile (tela
+   * estreita não cabe 6 ícones + campo de texto sem espremer o campo — ver
+   * MessageInput). O caller só passa isto quando `isMobile`; cada ação some
+   * do objeto se a feature correspondente não estiver disponível.
+   */
+  mobileExtraActions?: {
+    onOpenEmoji: () => void;
+    onToggleSignature?: () => void;
+    onOpenMacros?: () => void;
+    onOpenAIAssistance?: () => void;
+  };
 }
 
 const ITEM_ICON_BOX =
@@ -47,6 +63,7 @@ const ComposerPlusMenu: React.FC<ComposerPlusMenuProps> = ({
   onOpenConversationNote,
   onSchedule,
   onOpenTemplates,
+  mobileExtraActions,
 }) => {
   const { t } = useLanguage('chat');
   const [open, setOpen] = useState(false);
@@ -109,6 +126,46 @@ const ComposerPlusMenu: React.FC<ComposerPlusMenuProps> = ({
             icon: <LayoutTemplate className="h-4 w-4" />,
             onClick: onOpenTemplates,
           },
+        ]
+      : []),
+    ...(mobileExtraActions
+      ? [
+          {
+            key: 'emoji',
+            label: t('messageInput.composerMenu.emoji'),
+            icon: <Smile className="h-4 w-4" />,
+            onClick: mobileExtraActions.onOpenEmoji,
+          },
+          ...(mobileExtraActions.onOpenMacros
+            ? [
+                {
+                  key: 'macros',
+                  label: t('messageInput.macros.tooltip'),
+                  icon: <Zap className="h-4 w-4" />,
+                  onClick: mobileExtraActions.onOpenMacros,
+                },
+              ]
+            : []),
+          ...(mobileExtraActions.onToggleSignature
+            ? [
+                {
+                  key: 'signature',
+                  label: t('messageInput.signature.menuLabel'),
+                  icon: <PenLine className="h-4 w-4" />,
+                  onClick: mobileExtraActions.onToggleSignature,
+                },
+              ]
+            : []),
+          ...(mobileExtraActions.onOpenAIAssistance
+            ? [
+                {
+                  key: 'ai-assist',
+                  label: t('aiAssistance.button.title'),
+                  icon: <Sparkles className="h-4 w-4" />,
+                  onClick: mobileExtraActions.onOpenAIAssistance,
+                },
+              ]
+            : []),
         ]
       : []),
   ];

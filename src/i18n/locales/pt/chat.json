@@ -735,7 +735,8 @@
     },
     "signature": {
       "enable": "Habilitar assinatura",
-      "disable": "Desabilitar assinatura"
+      "disable": "Desabilitar assinatura",
+      "menuLabel": "Assinatura"
     },
     "placeholders": {
       "default": "Digite sua mensagem... (digite / para respostas prontas)",
@@ -748,7 +749,8 @@
       "documents": "Documentos",
       "media": "Fotos e Vídeos",
       "conversationNote": "Notas da Conversa",
-      "schedule": "Agendar"
+      "schedule": "Agendar",
+      "emoji": "Emoji"
     },
     "macros": {
       "tooltip": "Macros",

@@ -730,7 +730,8 @@
     },
     "signature": {
       "enable": "Abilita firma",
-      "disable": "Disabilita firma"
+      "disable": "Disabilita firma",
+      "menuLabel": "Firma"
     },
     "placeholders": {
       "default": "Digita il tuo messaggio... (digita / per risposte pronte)",
@@ -743,7 +744,8 @@
       "documents": "Documenti",
       "media": "Foto e Video",
       "conversationNote": "Note della Conversazione",
-      "schedule": "Pianifica"
+      "schedule": "Pianifica",
+      "emoji": "Emoji"
     },
     "macros": {
       "tooltip": "Macro",
