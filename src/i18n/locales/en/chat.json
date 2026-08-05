@@ -757,7 +757,8 @@
     },
     "signature": {
       "enable": "Enable signature",
-      "disable": "Disable signature"
+      "disable": "Disable signature",
+      "menuLabel": "Signature"
     },
     "placeholders": {
       "default": "Type your message... (type / for canned responses)",
@@ -770,7 +771,8 @@
       "documents": "Documents",
       "media": "Photos and Videos",
       "conversationNote": "Conversation Notes",
-      "schedule": "Schedule"
+      "schedule": "Schedule",
+      "emoji": "Emoji"
     },
     "macros": {
       "tooltip": "Macros",

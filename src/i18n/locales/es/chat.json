@@ -730,7 +730,8 @@
     },
     "signature": {
       "enable": "Habilitar firma",
-      "disable": "Deshabilitar firma"
+      "disable": "Deshabilitar firma",
+      "menuLabel": "Firma"
     },
     "placeholders": {
       "default": "Escribe tu mensaje... (escribe / para respuestas rápidas)",
@@ -743,7 +744,8 @@
       "documents": "Documentos",
       "media": "Fotos y Vídeos",
       "conversationNote": "Notas de la Conversación",
-      "schedule": "Programar"
+      "schedule": "Programar",
+      "emoji": "Emoji"
     },
     "macros": {
       "tooltip": "Macros",

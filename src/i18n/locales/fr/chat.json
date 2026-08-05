@@ -730,7 +730,8 @@
     },
     "signature": {
       "enable": "Activer la signature",
-      "disable": "Désactiver la signature"
+      "disable": "Désactiver la signature",
+      "menuLabel": "Signature"
     },
     "placeholders": {
       "default": "Tapez votre message... (tapez / pour les réponses prédéfinies)",
@@ -743,7 +744,8 @@
       "documents": "Documents",
       "media": "Photos et Vidéos",
       "conversationNote": "Notes de la Conversation",
-      "schedule": "Planifier"
+      "schedule": "Planifier",
+      "emoji": "Emoji"
     },
     "macros": {
       "tooltip": "Macros",
