@@ -4,30 +4,12 @@ import { BookOpenCheck, CheckSquare, File, Image, Loader2 } from 'lucide-react';
 
 import { proceduresService } from '@/services/procedures';
 import type { Procedure, ProcedureAttachment, ProcedureBlock } from '@/types/procedures';
-
-const imageExtensionPattern = /\.(avif|bmp|gif|jpe?g|png|svg|webp)$/i;
-
-function getAttachmentUrl(attachment: ProcedureAttachment) {
-  return attachment.data_url || attachment.file_url || '';
-}
-
-function getAttachmentPreviewUrl(attachment: ProcedureAttachment) {
-  return attachment.thumb_url || getAttachmentUrl(attachment);
-}
-
-function getAttachmentName(attachment: ProcedureAttachment) {
-  return attachment.file_name || attachment.fallback_title || attachment.file_type || 'Arquivo';
-}
-
-function isImageAttachment(attachment: ProcedureAttachment) {
-  const name = getAttachmentName(attachment);
-  return (
-    attachment.file_type === 'image' ||
-    attachment.content_type?.startsWith('image/') ||
-    imageExtensionPattern.test(name) ||
-    imageExtensionPattern.test(attachment.data_url || attachment.file_url || '')
-  );
-}
+import {
+  getAttachmentName,
+  getAttachmentPreviewUrl,
+  getAttachmentUrl,
+  isImageAttachment,
+} from '@/utils/procedureAttachments';
 
 function renderBlock(block: ProcedureBlock) {
   if (block.type === 'heading') {
