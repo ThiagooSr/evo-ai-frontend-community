@@ -30,10 +30,15 @@ export interface ProcedureAttachment {
   id: string;
   file_name?: string;
   file_type: string;
+  content_type?: string;
+  extension?: string;
   file_url?: string;
   data_url?: string;
+  thumb_url?: string;
   fallback_title?: string;
   file_size?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface Procedure {

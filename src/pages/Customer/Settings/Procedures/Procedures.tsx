@@ -25,6 +25,7 @@ import { usePermissions } from '@/contexts/PermissionsContext';
 import { proceduresService } from '@/services/procedures';
 import type {
   Procedure,
+  ProcedureAttachment,
   ProcedureBlock,
   ProcedureBlockType,
   ProcedureFormData,
@@ -136,6 +137,30 @@ const blockButtons: Array<{ type: ProcedureBlockType; icon: typeof FileText }> =
   { type: 'button', icon: Send },
 ];
 
+const imageExtensionPattern = /\.(avif|bmp|gif|jpe?g|png|svg|webp)$/i;
+
+function getAttachmentUrl(attachment: ProcedureAttachment) {
+  return attachment.data_url || attachment.file_url || '';
+}
+
+function getAttachmentPreviewUrl(attachment: ProcedureAttachment) {
+  return attachment.thumb_url || getAttachmentUrl(attachment);
+}
+
+function getAttachmentName(attachment: ProcedureAttachment) {
+  return attachment.file_name || attachment.fallback_title || attachment.file_type || 'Arquivo';
+}
+
+function isImageAttachment(attachment: ProcedureAttachment) {
+  const name = getAttachmentName(attachment);
+  return (
+    attachment.file_type === 'image' ||
+    attachment.content_type?.startsWith('image/') ||
+    imageExtensionPattern.test(name) ||
+    imageExtensionPattern.test(attachment.data_url || attachment.file_url || '')
+  );
+}
+
 function draftFromProcedure(procedure: Procedure): ProcedureDraft {
   const visibility: VisibilityDraft = {
     all: procedure.visibility.some(item => item.scope_type === 'all'),
@@ -222,6 +247,42 @@ function renderBlock(block: ProcedureBlock) {
     );
   }
 
+  if (block.type === 'image' && block.url) {
+    return (
+      <a href={block.url} target="_blank" rel="noreferrer" className="block max-w-3xl">
+        <img
+          src={block.url}
+          alt={block.label || block.text || 'Imagem do procedimento'}
+          className="max-h-[420px] w-full rounded-md border border-gray-200 object-contain"
+        />
+      </a>
+    );
+  }
+
+  if (block.type === 'video' && block.url) {
+    return (
+      <video
+        src={block.url}
+        controls
+        className="max-h-[420px] w-full rounded-md border border-gray-200 bg-black"
+      />
+    );
+  }
+
+  if (['file', 'link', 'button'].includes(block.type) && block.url) {
+    return (
+      <a
+        href={block.url}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+      >
+        <File className="h-4 w-4 text-gray-500" />
+        {block.label || block.text || block.url}
+      </a>
+    );
+  }
+
   if (['image', 'video', 'file', 'link', 'button'].includes(block.type)) {
     return (
       <div className="rounded border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
@@ -232,6 +293,52 @@ function renderBlock(block: ProcedureBlock) {
   }
 
   return <p className="text-sm leading-6 text-gray-700">{block.text || 'Texto do procedimento'}</p>;
+}
+
+function renderAttachment(attachment: ProcedureAttachment) {
+  const url = getAttachmentUrl(attachment);
+  const name = getAttachmentName(attachment);
+
+  if (isImageAttachment(attachment) && url) {
+    return (
+      <a
+        key={attachment.id}
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="group block overflow-hidden rounded-md border border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm"
+      >
+        <div className="aspect-video bg-gray-50">
+          <img
+            src={getAttachmentPreviewUrl(attachment)}
+            alt={name}
+            loading="lazy"
+            onError={event => {
+              if (event.currentTarget.src !== url) event.currentTarget.src = url;
+            }}
+            className="h-full w-full object-contain transition-transform group-hover:scale-[1.01]"
+          />
+        </div>
+        <div className="flex items-center gap-2 border-t border-gray-200 px-3 py-2 text-sm text-gray-700">
+          <Image className="h-4 w-4 text-blue-500" />
+          <span className="truncate">{name}</span>
+        </div>
+      </a>
+    );
+  }
+
+  return (
+    <a
+      key={attachment.id}
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-2 border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+    >
+      <File className="h-4 w-4 text-gray-500" />
+      <span className="truncate">{name}</span>
+    </a>
+  );
 }
 
 export default function Procedures() {
@@ -633,23 +740,8 @@ export default function Procedures() {
               {selectedProcedure.attachments.length > 0 && (
                 <div className="mt-8 border-t border-gray-200 pt-5">
                   <h3 className="text-sm font-semibold text-gray-950">Anexos</h3>
-                  <div className="mt-3 grid gap-2 md:grid-cols-2">
-                    {selectedProcedure.attachments.map(attachment => (
-                      <a
-                        key={attachment.id}
-                        href={attachment.file_url || attachment.data_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-2 border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      >
-                        <File className="h-4 w-4 text-gray-500" />
-                        <span className="truncate">
-                          {attachment.file_name ||
-                            attachment.fallback_title ||
-                            attachment.file_type}
-                        </span>
-                      </a>
-                    ))}
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    {selectedProcedure.attachments.map(renderAttachment)}
                   </div>
                 </div>
               )}

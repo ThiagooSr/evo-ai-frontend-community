@@ -1,9 +1,33 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { BookOpenCheck, CheckSquare, File, Loader2 } from 'lucide-react';
+import { BookOpenCheck, CheckSquare, File, Image, Loader2 } from 'lucide-react';
 
 import { proceduresService } from '@/services/procedures';
-import type { Procedure, ProcedureBlock } from '@/types/procedures';
+import type { Procedure, ProcedureAttachment, ProcedureBlock } from '@/types/procedures';
+
+const imageExtensionPattern = /\.(avif|bmp|gif|jpe?g|png|svg|webp)$/i;
+
+function getAttachmentUrl(attachment: ProcedureAttachment) {
+  return attachment.data_url || attachment.file_url || '';
+}
+
+function getAttachmentPreviewUrl(attachment: ProcedureAttachment) {
+  return attachment.thumb_url || getAttachmentUrl(attachment);
+}
+
+function getAttachmentName(attachment: ProcedureAttachment) {
+  return attachment.file_name || attachment.fallback_title || attachment.file_type || 'Arquivo';
+}
+
+function isImageAttachment(attachment: ProcedureAttachment) {
+  const name = getAttachmentName(attachment);
+  return (
+    attachment.file_type === 'image' ||
+    attachment.content_type?.startsWith('image/') ||
+    imageExtensionPattern.test(name) ||
+    imageExtensionPattern.test(attachment.data_url || attachment.file_url || '')
+  );
+}
 
 function renderBlock(block: ProcedureBlock) {
   if (block.type === 'heading') {
@@ -20,7 +44,15 @@ function renderBlock(block: ProcedureBlock) {
   }
 
   if (block.type === 'image' && block.url) {
-    return <img src={block.url} alt={block.label || block.text || 'Procedimento'} className="w-full rounded-md border border-gray-200" />;
+    return (
+      <a href={block.url} target="_blank" rel="noreferrer" className="block">
+        <img
+          src={block.url}
+          alt={block.label || block.text || 'Procedimento'}
+          className="max-h-[560px] w-full rounded-md border border-gray-200 object-contain"
+        />
+      </a>
+    );
   }
 
   if (block.type === 'video' && block.url) {
@@ -42,6 +74,52 @@ function renderBlock(block: ProcedureBlock) {
   }
 
   return <p className="text-base leading-7 text-gray-700">{block.text}</p>;
+}
+
+function renderAttachment(attachment: ProcedureAttachment) {
+  const url = getAttachmentUrl(attachment);
+  const name = getAttachmentName(attachment);
+
+  if (isImageAttachment(attachment) && url) {
+    return (
+      <a
+        key={attachment.id}
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="group block overflow-hidden rounded-md border border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm"
+      >
+        <div className="aspect-video bg-gray-50">
+          <img
+            src={getAttachmentPreviewUrl(attachment)}
+            alt={name}
+            loading="lazy"
+            onError={event => {
+              if (event.currentTarget.src !== url) event.currentTarget.src = url;
+            }}
+            className="h-full w-full object-contain transition-transform group-hover:scale-[1.01]"
+          />
+        </div>
+        <div className="flex items-center gap-2 border-t border-gray-200 px-3 py-2 text-sm text-gray-700">
+          <Image className="h-4 w-4 text-blue-500" />
+          <span className="truncate">{name}</span>
+        </div>
+      </a>
+    );
+  }
+
+  return (
+    <a
+      key={attachment.id}
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+    >
+      <File className="h-4 w-4 text-gray-500" />
+      {name}
+    </a>
+  );
 }
 
 export default function PublicProcedure() {
@@ -106,19 +184,8 @@ export default function PublicProcedure() {
         {procedure.attachments.length > 0 && (
           <div className="mt-10 border-t border-gray-200 pt-6">
             <h2 className="text-sm font-semibold uppercase text-gray-500">Anexos</h2>
-            <div className="mt-3 space-y-2">
-              {procedure.attachments.map(attachment => (
-                <a
-                  key={attachment.id}
-                  href={attachment.file_url || attachment.data_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  <File className="h-4 w-4 text-gray-500" />
-                  {attachment.file_name || attachment.fallback_title || attachment.file_type}
-                </a>
-              ))}
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {procedure.attachments.map(renderAttachment)}
             </div>
           </div>
         )}
