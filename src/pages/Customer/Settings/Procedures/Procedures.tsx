@@ -4,7 +4,9 @@ import {
   Archive,
   BookOpenCheck,
   CheckSquare,
+  Copy,
   Edit,
+  ExternalLink,
   File,
   FileText,
   Globe2,
@@ -148,6 +150,12 @@ const blockButtons: Array<{ type: ProcedureBlockType; icon: typeof FileText }> =
   { type: 'link', icon: Link },
   { type: 'button', icon: Send },
 ];
+
+function getPublicProcedureUrl(procedure: Procedure) {
+  if (!procedure.public_token) return '';
+
+  return `${window.location.origin}/procedures/public/${procedure.public_token}`;
+}
 
 function draftFromProcedure(procedure: Procedure): ProcedureDraft {
   const visibility: VisibilityDraft = {
@@ -461,6 +469,23 @@ export default function Procedures() {
     event.target.value = '';
   };
 
+  const copyPublicLink = async (procedure: Procedure) => {
+    const publicUrl = getPublicProcedureUrl(procedure);
+
+    if (!publicUrl) {
+      toast.error('Publique o procedimento para gerar o link publico.');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      toast.success('Link publico copiado.');
+    } catch (error) {
+      console.error('Error copying public procedure link:', error);
+      toast.error('Nao foi possivel copiar o link.');
+    }
+  };
+
   const markAttachmentForRemoval = (attachmentId: string) => {
     setDraft(current => ({
       ...current,
@@ -716,6 +741,22 @@ export default function Procedures() {
                       Publicar
                     </Button>
                   )}
+                  {selectedProcedure.visibility.some(item => item.scope_type === 'public_link') &&
+                    can('procedures', 'share') && (
+                      <Button
+                        variant="outline"
+                        onClick={() => copyPublicLink(selectedProcedure)}
+                        disabled={!selectedProcedure.public_token}
+                        title={
+                          selectedProcedure.public_token
+                            ? getPublicProcedureUrl(selectedProcedure)
+                            : 'Publique o procedimento para gerar o link publico'
+                        }
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copiar link
+                      </Button>
+                    )}
                   {can('procedures', 'update') && (
                     <Button
                       variant="outline"
@@ -738,6 +779,32 @@ export default function Procedures() {
                   )}
                 </div>
               </div>
+
+              {selectedProcedure.visibility.some(item => item.scope_type === 'public_link') && (
+                <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase text-emerald-700">Link publico</p>
+                  {selectedProcedure.public_token ? (
+                    <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-center">
+                      <code className="min-w-0 flex-1 truncate rounded border border-emerald-200 bg-white px-3 py-2 text-sm text-emerald-900">
+                        {getPublicProcedureUrl(selectedProcedure)}
+                      </code>
+                      <a
+                        href={getPublicProcedureUrl(selectedProcedure)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-center rounded-md border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100"
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Abrir
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-sm text-emerald-800">
+                      Publique o procedimento para gerar o link de compartilhamento.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="mt-5 grid gap-4 md:grid-cols-3">
                 <div className="border border-gray-200 p-3">
