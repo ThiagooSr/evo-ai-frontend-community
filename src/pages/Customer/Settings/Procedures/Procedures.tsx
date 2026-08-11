@@ -157,6 +157,10 @@ function getPublicProcedureUrl(procedure: Procedure) {
   return `${window.location.origin}/procedures/public/${procedure.public_token}`;
 }
 
+function hasPublicLinkVisibility(procedure: Procedure) {
+  return procedure.visibility.some(item => item.scope_type === 'public_link');
+}
+
 function draftFromProcedure(procedure: Procedure): ProcedureDraft {
   const visibility: VisibilityDraft = {
     all: procedure.visibility.some(item => item.scope_type === 'all'),
@@ -469,8 +473,42 @@ export default function Procedures() {
     event.target.value = '';
   };
 
+  const replaceProcedureInState = (procedure: Procedure) => {
+    setProcedures(current =>
+      current.map(item => (item.id === procedure.id ? procedure : item)),
+    );
+    setSelectedId(procedure.id);
+  };
+
+  const resolvePublicLinkProcedure = async (procedure: Procedure) => {
+    let currentProcedure = procedure;
+
+    if (!currentProcedure.public_token) {
+      try {
+        currentProcedure = await proceduresService.getProcedure(procedure.id);
+        replaceProcedureInState(currentProcedure);
+      } catch (error) {
+        console.error('Error loading public procedure token:', error);
+      }
+    }
+
+    if (!currentProcedure.public_token && currentProcedure.status === 'published') {
+      try {
+        currentProcedure = await proceduresService.publishProcedure(procedure.id);
+        replaceProcedureInState(currentProcedure);
+      } catch (error) {
+        console.error('Error generating public procedure token:', error);
+        toast.error('Nao foi possivel gerar o link publico.');
+        return null;
+      }
+    }
+
+    return currentProcedure.public_token ? currentProcedure : null;
+  };
+
   const copyPublicLink = async (procedure: Procedure) => {
-    const publicUrl = getPublicProcedureUrl(procedure);
+    const procedureWithToken = await resolvePublicLinkProcedure(procedure);
+    const publicUrl = procedureWithToken ? getPublicProcedureUrl(procedureWithToken) : '';
 
     if (!publicUrl) {
       toast.error('Publique o procedimento para gerar o link publico.');
@@ -711,9 +749,7 @@ export default function Procedures() {
                     <span className="rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
                       {labelsByUsageMode[selectedProcedure.usage_mode]}
                     </span>
-                    {selectedProcedure.visibility.some(
-                      item => item.scope_type === 'public_link',
-                    ) && (
+                    {hasPublicLinkVisibility(selectedProcedure) && (
                       <span className="inline-flex items-center rounded bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
                         <Globe2 className="mr-1 h-3 w-3" />
                         Link publico ativo
@@ -741,22 +777,21 @@ export default function Procedures() {
                       Publicar
                     </Button>
                   )}
-                  {selectedProcedure.visibility.some(item => item.scope_type === 'public_link') &&
-                    can('procedures', 'share') && (
-                      <Button
-                        variant="outline"
-                        onClick={() => copyPublicLink(selectedProcedure)}
-                        disabled={!selectedProcedure.public_token}
-                        title={
-                          selectedProcedure.public_token
-                            ? getPublicProcedureUrl(selectedProcedure)
-                            : 'Publique o procedimento para gerar o link publico'
-                        }
-                      >
-                        <Copy className="mr-2 h-4 w-4" />
-                        Copiar link
-                      </Button>
-                    )}
+                  {hasPublicLinkVisibility(selectedProcedure) && can('procedures', 'share') && (
+                    <Button
+                      variant="outline"
+                      onClick={() => copyPublicLink(selectedProcedure)}
+                      disabled={saving || selectedProcedure.status !== 'published'}
+                      title={
+                        selectedProcedure.public_token
+                          ? getPublicProcedureUrl(selectedProcedure)
+                          : 'Publique o procedimento para gerar o link publico'
+                      }
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      {selectedProcedure.public_token ? 'Copiar link' : 'Gerar link'}
+                    </Button>
+                  )}
                   {can('procedures', 'update') && (
                     <Button
                       variant="outline"
@@ -780,7 +815,7 @@ export default function Procedures() {
                 </div>
               </div>
 
-              {selectedProcedure.visibility.some(item => item.scope_type === 'public_link') && (
+              {hasPublicLinkVisibility(selectedProcedure) && (
                 <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3">
                   <p className="text-xs font-semibold uppercase text-emerald-700">Link publico</p>
                   {selectedProcedure.public_token ? (
@@ -800,7 +835,9 @@ export default function Procedures() {
                     </div>
                   ) : (
                     <p className="mt-1 text-sm text-emerald-800">
-                      Publique o procedimento para gerar o link de compartilhamento.
+                      {selectedProcedure.status === 'published'
+                        ? 'Clique em Gerar link para criar o link de compartilhamento.'
+                        : 'Publique o procedimento para gerar o link de compartilhamento.'}
                     </p>
                   )}
                 </div>
