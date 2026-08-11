@@ -19,15 +19,7 @@ import {
   Video,
   X,
 } from 'lucide-react';
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@evoapi/design-system';
+import { Button } from '@evoapi/design-system';
 
 import { usePermissions } from '@/contexts/PermissionsContext';
 import { proceduresService } from '@/services/procedures';
@@ -73,7 +65,10 @@ const emptyTargets = (): TargetsDraft => ({
 });
 
 const newBlock = (type: ProcedureBlockType): ProcedureBlock => ({
-  id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Date.now()),
+  id:
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : String(Date.now()),
   type,
   text: type === 'heading' ? 'Novo titulo' : '',
   label: type === 'button' ? 'Abrir link' : '',
@@ -213,7 +208,9 @@ function toPayload(draft: ProcedureDraft): ProcedureFormData {
 
 function renderBlock(block: ProcedureBlock) {
   if (block.type === 'heading') {
-    return <h3 className="text-lg font-semibold text-gray-950">{block.text || 'Titulo sem texto'}</h3>;
+    return (
+      <h3 className="text-lg font-semibold text-gray-950">{block.text || 'Titulo sem texto'}</h3>
+    );
   }
 
   if (block.type === 'checklist') {
@@ -271,7 +268,10 @@ export default function Procedures() {
   const filteredProcedures = useMemo(() => procedures, [procedures]);
 
   const selectedProcedure = useMemo(
-    () => filteredProcedures.find(procedure => procedure.id === selectedId) || filteredProcedures[0] || null,
+    () =>
+      filteredProcedures.find(procedure => procedure.id === selectedId) ||
+      filteredProcedures[0] ||
+      null,
     [filteredProcedures, selectedId],
   );
 
@@ -342,8 +342,13 @@ export default function Procedures() {
       let saved: Procedure;
       if (editingProcedure) {
         const updatePayload: Partial<ProcedureFormData> = { ...payload };
-        const hasPublicVisibility = updatePayload.visibility?.some(item => item.scope_type === 'public_link');
-        if (!can('procedures', 'manage_visibility') || (hasPublicVisibility && !can('procedures', 'share'))) {
+        const hasPublicVisibility = updatePayload.visibility?.some(
+          item => item.scope_type === 'public_link',
+        );
+        if (
+          !can('procedures', 'manage_visibility') ||
+          (hasPublicVisibility && !can('procedures', 'share'))
+        ) {
           delete updatePayload.visibility;
         }
         saved = await proceduresService.updateProcedure(editingProcedure.id, updatePayload);
@@ -425,7 +430,10 @@ export default function Procedures() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-gray-50 p-4" data-tour="settings-procedures-page">
+    <div
+      className="flex h-full min-h-0 flex-col bg-gray-50 p-4"
+      data-tour="settings-procedures-page"
+    >
       <div className="mb-4 flex flex-col gap-3 border-b border-gray-200 bg-white px-4 py-4 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase text-blue-700">
@@ -434,7 +442,8 @@ export default function Procedures() {
           </div>
           <h1 className="mt-1 text-2xl font-semibold text-gray-950">Procedimentos</h1>
           <p className="mt-1 text-sm text-gray-600">
-            Cadastre passo a passo com midias, escopos de visibilidade e uso interno ou para cliente.
+            Cadastre passo a passo com midias, escopos de visibilidade e uso interno ou para
+            cliente.
           </p>
         </div>
 
@@ -479,12 +488,16 @@ export default function Procedures() {
                     type="button"
                     onClick={() => setSelectedId(procedure.id)}
                     className={`w-full px-4 py-3 text-left transition ${
-                      selectedProcedure?.id === procedure.id ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'
+                      selectedProcedure?.id === procedure.id
+                        ? 'bg-blue-50'
+                        : 'bg-white hover:bg-gray-50'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-gray-950">{procedure.title}</p>
+                        <p className="truncate text-sm font-semibold text-gray-950">
+                          {procedure.title}
+                        </p>
                         <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-600">
                           {procedure.description || 'Sem descricao'}
                         </p>
@@ -533,14 +546,18 @@ export default function Procedures() {
                     <span className="rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
                       {labelsByUsageMode[selectedProcedure.usage_mode]}
                     </span>
-                  {selectedProcedure.visibility.some(item => item.scope_type === 'public_link') && (
-                    <span className="inline-flex items-center rounded bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
-                      <Globe2 className="mr-1 h-3 w-3" />
+                    {selectedProcedure.visibility.some(
+                      item => item.scope_type === 'public_link',
+                    ) && (
+                      <span className="inline-flex items-center rounded bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
+                        <Globe2 className="mr-1 h-3 w-3" />
                         Link publico ativo
                       </span>
                     )}
                   </div>
-                  <h2 className="mt-3 text-2xl font-semibold text-gray-950">{selectedProcedure.title}</h2>
+                  <h2 className="mt-3 text-2xl font-semibold text-gray-950">
+                    {selectedProcedure.title}
+                  </h2>
                   <p className="mt-2 text-sm leading-6 text-gray-600">
                     {selectedProcedure.description || 'Sem descricao cadastrada.'}
                   </p>
@@ -560,13 +577,21 @@ export default function Procedures() {
                     </Button>
                   )}
                   {can('procedures', 'update') && (
-                    <Button variant="outline" onClick={() => archiveProcedure(selectedProcedure)} disabled={saving}>
+                    <Button
+                      variant="outline"
+                      onClick={() => archiveProcedure(selectedProcedure)}
+                      disabled={saving}
+                    >
                       <Archive className="mr-2 h-4 w-4" />
                       Arquivar
                     </Button>
                   )}
                   {can('procedures', 'delete') && (
-                    <Button variant="destructive" onClick={() => deleteProcedure(selectedProcedure)} disabled={saving}>
+                    <Button
+                      variant="destructive"
+                      onClick={() => deleteProcedure(selectedProcedure)}
+                      disabled={saving}
+                    >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Remover
                     </Button>
@@ -577,16 +602,22 @@ export default function Procedures() {
               <div className="mt-5 grid gap-4 md:grid-cols-3">
                 <div className="border border-gray-200 p-3">
                   <p className="text-xs font-semibold uppercase text-gray-500">Categoria</p>
-                  <p className="mt-1 text-sm text-gray-900">{selectedProcedure.category || 'Sem categoria'}</p>
+                  <p className="mt-1 text-sm text-gray-900">
+                    {selectedProcedure.category || 'Sem categoria'}
+                  </p>
                 </div>
                 <div className="border border-gray-200 p-3">
                   <p className="text-xs font-semibold uppercase text-gray-500">Tags</p>
-                  <p className="mt-1 text-sm text-gray-900">{selectedProcedure.tags.join(', ') || 'Sem tags'}</p>
+                  <p className="mt-1 text-sm text-gray-900">
+                    {selectedProcedure.tags.join(', ') || 'Sem tags'}
+                  </p>
                 </div>
                 <div className="border border-gray-200 p-3">
                   <p className="text-xs font-semibold uppercase text-gray-500">Visibilidade</p>
                   <p className="mt-1 text-sm text-gray-900">
-                    {selectedProcedure.visibility.map(item => labelsByScope[item.scope_type]).join(', ') || 'Todos'}
+                    {selectedProcedure.visibility
+                      .map(item => labelsByScope[item.scope_type])
+                      .join(', ') || 'Todos'}
                   </p>
                 </div>
               </div>
@@ -613,7 +644,9 @@ export default function Procedures() {
                       >
                         <File className="h-4 w-4 text-gray-500" />
                         <span className="truncate">
-                          {attachment.file_name || attachment.fallback_title || attachment.file_type}
+                          {attachment.file_name ||
+                            attachment.fallback_title ||
+                            attachment.file_type}
                         </span>
                       </a>
                     ))}
@@ -630,269 +663,321 @@ export default function Procedures() {
         </section>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingProcedure ? 'Editar procedimento' : 'Novo procedimento'}</DialogTitle>
-            <DialogDescription>
-              Defina conteudo, anexos, permissao de uso e onde o passo a passo fica disponivel.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="space-y-1 text-sm font-medium text-gray-700">
-                  Titulo
-                  <input
-                    value={draft.title}
-                    onChange={event => setDraft(current => ({ ...current, title: event.target.value }))}
-                    className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
-                </label>
-                <label className="space-y-1 text-sm font-medium text-gray-700">
-                  Categoria
-                  <input
-                    value={draft.category}
-                    onChange={event => setDraft(current => ({ ...current, category: event.target.value }))}
-                    placeholder="Ex: Financeiro, suporte, implantacao"
-                    className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
-                </label>
+      {dialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+          <div className="flex max-h-[94vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 text-slate-100 shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-6 py-5">
+              <div>
+                <h2 className="text-xl font-semibold text-white">
+                  {editingProcedure ? 'Editar procedimento' : 'Novo procedimento'}
+                </h2>
+                <p className="mt-1 max-w-3xl text-sm text-slate-300">
+                  Defina conteudo, anexos, permissao de uso e onde o passo a passo fica disponivel.
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setDialogOpen(false)}
+                className="rounded-md p-2 text-slate-400 hover:bg-slate-900 hover:text-white"
+                aria-label="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-              <label className="space-y-1 text-sm font-medium text-gray-700">
-                Descricao
-                <textarea
-                  value={draft.description}
-                  onChange={event => setDraft(current => ({ ...current, description: event.target.value }))}
-                  rows={3}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </label>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+                <div className="min-w-0 space-y-5">
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,1.4fr)_minmax(220px,0.6fr)]">
+                    <label className="space-y-1 text-sm font-medium text-slate-300">
+                      Titulo
+                      <input
+                        value={draft.title}
+                        onChange={event =>
+                          setDraft(current => ({ ...current, title: event.target.value }))
+                        }
+                        className="h-11 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </label>
+                    <label className="space-y-1 text-sm font-medium text-slate-300">
+                      Categoria
+                      <input
+                        value={draft.category}
+                        onChange={event =>
+                          setDraft(current => ({ ...current, category: event.target.value }))
+                        }
+                        placeholder="Ex: Financeiro, suporte, implantacao"
+                        className="h-11 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </label>
+                  </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="space-y-1 text-sm font-medium text-gray-700">
-                  Tags
-                  <input
-                    value={draft.tags}
-                    onChange={event => setDraft(current => ({ ...current, tags: event.target.value }))}
-                    placeholder="separe por virgula"
-                    className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
-                </label>
-                <label className="space-y-1 text-sm font-medium text-gray-700">
-                  Uso permitido
-                  <select
-                    value={draft.usageMode}
-                    onChange={event =>
-                      setDraft(current => ({ ...current, usageMode: event.target.value as ProcedureUsageMode }))
-                    }
-                    className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  >
-                    <option value="internal">Somente interno</option>
-                    <option value="customer">Enviar ao cliente</option>
-                    <option value="both">Interno e cliente</option>
-                  </select>
-                </label>
-              </div>
+                  <label className="space-y-1 text-sm font-medium text-slate-300">
+                    Descricao
+                    <textarea
+                      value={draft.description}
+                      onChange={event =>
+                        setDraft(current => ({ ...current, description: event.target.value }))
+                      }
+                      rows={3}
+                      className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </label>
 
-              <div className="border border-gray-200">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2">
-                  <p className="text-sm font-semibold text-gray-900">Blocos do passo a passo</p>
-                  <div className="flex flex-wrap gap-1">
-                    {blockButtons.map(({ type, icon: Icon }) => (
-                      <Button key={type} type="button" variant="outline" size="sm" onClick={() => addBlock(type)}>
-                        <Icon className="mr-1 h-3.5 w-3.5" />
-                        {labelsByBlock[type]}
-                      </Button>
-                    ))}
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+                    <label className="space-y-1 text-sm font-medium text-slate-300">
+                      Tags
+                      <input
+                        value={draft.tags}
+                        onChange={event =>
+                          setDraft(current => ({ ...current, tags: event.target.value }))
+                        }
+                        placeholder="separe por virgula"
+                        className="h-11 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </label>
+                    <label className="space-y-1 text-sm font-medium text-slate-300">
+                      Uso permitido
+                      <select
+                        value={draft.usageMode}
+                        onChange={event =>
+                          setDraft(current => ({
+                            ...current,
+                            usageMode: event.target.value as ProcedureUsageMode,
+                          }))
+                        }
+                        className="h-11 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                      >
+                        <option value="internal">Somente interno</option>
+                        <option value="customer">Enviar ao cliente</option>
+                        <option value="both">Interno e cliente</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-900/40">
+                    <div className="flex flex-col gap-3 border-b border-slate-800 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+                      <p className="text-sm font-semibold text-white">Blocos do passo a passo</p>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:flex-wrap">
+                        {blockButtons.map(({ type, icon: Icon }) => (
+                          <Button
+                            key={type}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => addBlock(type)}
+                          >
+                            <Icon className="mr-1 h-3.5 w-3.5" />
+                            {labelsByBlock[type]}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 p-4">
+                      {draft.blocks.map((block, index) => (
+                        <div
+                          key={block.id}
+                          className="rounded-lg border border-slate-800 bg-slate-950 p-4"
+                        >
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold uppercase text-slate-400">
+                              {index + 1}. {labelsByBlock[block.type]}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeBlock(block.id)}
+                              className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+                              aria-label="Remover bloco"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          {['image', 'video', 'file', 'link', 'button'].includes(block.type) && (
+                            <div className="mb-2 grid gap-2 md:grid-cols-2">
+                              <input
+                                value={block.label || ''}
+                                onChange={event =>
+                                  updateBlock(block.id, { label: event.target.value })
+                                }
+                                placeholder="Rotulo"
+                                className="h-10 rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                              />
+                              <input
+                                value={block.url || ''}
+                                onChange={event =>
+                                  updateBlock(block.id, { url: event.target.value })
+                                }
+                                placeholder="URL"
+                                className="h-10 rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                              />
+                            </div>
+                          )}
+
+                          <textarea
+                            value={block.text || ''}
+                            onChange={event => updateBlock(block.id, { text: event.target.value })}
+                            rows={block.type === 'paragraph' ? 4 : 2}
+                            placeholder="Conteudo do bloco"
+                            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-3 p-3">
-                  {draft.blocks.map((block, index) => (
-                    <div key={block.id} className="border border-gray-200 bg-white p-3">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="text-xs font-semibold uppercase text-gray-500">
-                          {index + 1}. {labelsByBlock[block.type]}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeBlock(block.id)}
-                          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                          aria-label="Remover bloco"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-
-                      {['image', 'video', 'file', 'link', 'button'].includes(block.type) && (
-                        <div className="mb-2 grid gap-2 md:grid-cols-2">
-                          <input
-                            value={block.label || ''}
-                            onChange={event => updateBlock(block.id, { label: event.target.value })}
-                            placeholder="Rotulo"
-                            className="h-9 rounded-md border border-gray-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                          />
-                          <input
-                            value={block.url || ''}
-                            onChange={event => updateBlock(block.id, { url: event.target.value })}
-                            placeholder="URL"
-                            className="h-9 rounded-md border border-gray-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                          />
-                        </div>
-                      )}
-
-                      <textarea
-                        value={block.text || ''}
-                        onChange={event => updateBlock(block.id, { text: event.target.value })}
-                        rows={block.type === 'paragraph' ? 4 : 2}
-                        placeholder="Conteudo do bloco"
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                <aside className="min-w-0 space-y-4">
+                  <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
+                    <p className="text-sm font-semibold text-white">Visibilidade</p>
+                    <label className="mt-3 flex items-center gap-2 text-sm text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={draft.visibility.all}
+                        onChange={event =>
+                          setDraft(current => ({
+                            ...current,
+                            visibility: { ...current.visibility, all: event.target.checked },
+                          }))
+                        }
                       />
-                    </div>
-                  ))}
-                </div>
+                      Todos os atendentes
+                    </label>
+                    <label className="mt-2 flex items-center gap-2 text-sm text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={draft.visibility.publicLink}
+                        onChange={event =>
+                          setDraft(current => ({
+                            ...current,
+                            visibility: { ...current.visibility, publicLink: event.target.checked },
+                          }))
+                        }
+                      />
+                      Gerar link publico
+                    </label>
+                    <label className="mt-3 block text-sm font-medium text-slate-300">
+                      IDs de times
+                      <textarea
+                        value={draft.visibility.teamIds}
+                        onChange={event =>
+                          setDraft(current => ({
+                            ...current,
+                            visibility: { ...current.visibility, teamIds: event.target.value },
+                          }))
+                        }
+                        rows={3}
+                        placeholder="Um UUID por linha"
+                        className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </label>
+                    <label className="mt-3 block text-sm font-medium text-slate-300">
+                      IDs de canais/inboxes
+                      <textarea
+                        value={draft.visibility.inboxIds}
+                        onChange={event =>
+                          setDraft(current => ({
+                            ...current,
+                            visibility: { ...current.visibility, inboxIds: event.target.value },
+                          }))
+                        }
+                        rows={3}
+                        placeholder="Um UUID por linha"
+                        className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
+                    <p className="text-sm font-semibold text-white">Sugestoes automaticas</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Cadastre IDs para preparar sugestao por etiqueta, produto, inbox ou etapa.
+                    </p>
+                    {Object.keys(draft.targets).map(targetType => (
+                      <label
+                        key={targetType}
+                        className="mt-3 block text-sm font-medium text-slate-300"
+                      >
+                        {targetType}
+                        <textarea
+                          value={draft.targets[targetType as ProcedureTargetType]}
+                          onChange={event =>
+                            setDraft(current => ({
+                              ...current,
+                              targets: { ...current.targets, [targetType]: event.target.value },
+                            }))
+                          }
+                          rows={2}
+                          className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                        />
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
+                    <p className="text-sm font-semibold text-white">Anexos</p>
+                    <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-slate-700 px-3 py-5 text-sm text-slate-300 hover:bg-slate-900">
+                      <Upload className="h-4 w-4" />
+                      Adicionar arquivos
+                      <input type="file" multiple className="hidden" onChange={handleFileChange} />
+                    </label>
+                    {draft.attachments.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {draft.attachments.map(file => (
+                          <div
+                            key={`${file.name}-${file.size}`}
+                            className="flex items-center justify-between gap-2 text-xs text-slate-300"
+                          >
+                            <span className="truncate">{file.name}</span>
+                            <span>{Math.ceil(file.size / 1024)} KB</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {editingProcedure?.attachments.length ? (
+                      <div className="mt-3 space-y-2">
+                        {editingProcedure.attachments.map(attachment => {
+                          const removing = draft.removeAttachmentIds.includes(attachment.id);
+                          return (
+                            <button
+                              key={attachment.id}
+                              type="button"
+                              onClick={() => markAttachmentForRemoval(attachment.id)}
+                              className={`flex w-full items-center justify-between gap-2 rounded border px-2 py-1 text-left text-xs ${
+                                removing
+                                  ? 'border-red-500/40 bg-red-500/10 text-red-300'
+                                  : 'border-slate-700 text-slate-300'
+                              }`}
+                            >
+                              <span className="truncate">
+                                {attachment.file_name ||
+                                  attachment.fallback_title ||
+                                  attachment.file_type}
+                              </span>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                </aside>
               </div>
             </div>
 
-            <aside className="space-y-4">
-              <div className="border border-gray-200 p-3">
-                <p className="text-sm font-semibold text-gray-900">Visibilidade</p>
-                <label className="mt-3 flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={draft.visibility.all}
-                    onChange={event =>
-                      setDraft(current => ({
-                        ...current,
-                        visibility: { ...current.visibility, all: event.target.checked },
-                      }))
-                    }
-                  />
-                  Todos os atendentes
-                </label>
-                <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={draft.visibility.publicLink}
-                    onChange={event =>
-                      setDraft(current => ({
-                        ...current,
-                        visibility: { ...current.visibility, publicLink: event.target.checked },
-                      }))
-                    }
-                  />
-                  Gerar link publico
-                </label>
-                <label className="mt-3 block text-sm font-medium text-gray-700">
-                  IDs de times
-                  <textarea
-                    value={draft.visibility.teamIds}
-                    onChange={event =>
-                      setDraft(current => ({
-                        ...current,
-                        visibility: { ...current.visibility, teamIds: event.target.value },
-                      }))
-                    }
-                    rows={3}
-                    placeholder="Um UUID por linha"
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
-                </label>
-                <label className="mt-3 block text-sm font-medium text-gray-700">
-                  IDs de canais/inboxes
-                  <textarea
-                    value={draft.visibility.inboxIds}
-                    onChange={event =>
-                      setDraft(current => ({
-                        ...current,
-                        visibility: { ...current.visibility, inboxIds: event.target.value },
-                      }))
-                    }
-                    rows={3}
-                    placeholder="Um UUID por linha"
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
-                </label>
-              </div>
-
-              <div className="border border-gray-200 p-3">
-                <p className="text-sm font-semibold text-gray-900">Sugestoes automaticas</p>
-                <p className="mt-1 text-xs text-gray-500">Cadastre IDs para preparar sugestao por etiqueta, produto, inbox ou etapa.</p>
-                {Object.keys(draft.targets).map(targetType => (
-                  <label key={targetType} className="mt-3 block text-sm font-medium text-gray-700">
-                    {targetType}
-                    <textarea
-                      value={draft.targets[targetType as ProcedureTargetType]}
-                      onChange={event =>
-                        setDraft(current => ({
-                          ...current,
-                          targets: { ...current.targets, [targetType]: event.target.value },
-                        }))
-                      }
-                      rows={2}
-                      className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    />
-                  </label>
-                ))}
-              </div>
-
-              <div className="border border-gray-200 p-3">
-                <p className="text-sm font-semibold text-gray-900">Anexos</p>
-                <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-5 text-sm text-gray-600 hover:bg-gray-50">
-                  <Upload className="h-4 w-4" />
-                  Adicionar arquivos
-                  <input type="file" multiple className="hidden" onChange={handleFileChange} />
-                </label>
-                {draft.attachments.length > 0 && (
-                  <div className="mt-3 space-y-2">
-                    {draft.attachments.map(file => (
-                      <div key={`${file.name}-${file.size}`} className="flex items-center justify-between gap-2 text-xs text-gray-700">
-                        <span className="truncate">{file.name}</span>
-                        <span>{Math.ceil(file.size / 1024)} KB</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {editingProcedure?.attachments.length ? (
-                  <div className="mt-3 space-y-2">
-                    {editingProcedure.attachments.map(attachment => {
-                      const removing = draft.removeAttachmentIds.includes(attachment.id);
-                      return (
-                        <button
-                          key={attachment.id}
-                          type="button"
-                          onClick={() => markAttachmentForRemoval(attachment.id)}
-                          className={`flex w-full items-center justify-between gap-2 border px-2 py-1 text-left text-xs ${
-                            removing ? 'border-red-200 bg-red-50 text-red-700' : 'border-gray-200 text-gray-700'
-                          }`}
-                        >
-                          <span className="truncate">
-                            {attachment.file_name || attachment.fallback_title || attachment.file_type}
-                          </span>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-            </aside>
+            <div className="flex justify-end gap-2 border-t border-slate-800 px-6 py-4">
+              <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
+                Cancelar
+              </Button>
+              <Button onClick={saveProcedure} disabled={saving}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar procedimento
+              </Button>
+            </div>
           </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button onClick={saveProcedure} disabled={saving}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Salvar procedimento
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </div>
   );
 }
