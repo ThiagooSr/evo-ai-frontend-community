@@ -64,6 +64,12 @@ type ProcedureDraft = {
   removeAttachmentIds: string[];
 };
 
+type ImagePreview = {
+  url: string;
+  previewUrl?: string;
+  title: string;
+};
+
 const emptyTargets = (): TargetsDraft => ({
   label: '',
   product: '',
@@ -213,7 +219,43 @@ function toPayload(draft: ProcedureDraft): ProcedureFormData {
   };
 }
 
-function renderBlock(block: ProcedureBlock) {
+function ImagePreviewModal({ image, onClose }: { image: ImagePreview; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={image.title}
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-slate-950 shadow-2xl"
+        onClick={event => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
+          <p className="truncate text-sm font-medium text-white">{image.title}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-slate-300 hover:bg-slate-800 hover:text-white"
+            aria-label="Fechar imagem"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 bg-black p-3">
+          <img
+            src={image.url}
+            alt={image.title}
+            className="mx-auto max-h-[82vh] w-auto max-w-full object-contain"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function renderBlock(block: ProcedureBlock, openImagePreview: (image: ImagePreview) => void) {
   if (block.type === 'heading') {
     return (
       <h3 className="text-lg font-semibold text-gray-950">{block.text || 'Titulo sem texto'}</h3>
@@ -230,14 +272,19 @@ function renderBlock(block: ProcedureBlock) {
   }
 
   if (block.type === 'image' && block.url) {
+    const title = block.label || block.text || 'Imagem do procedimento';
     return (
-      <a href={block.url} target="_blank" rel="noreferrer" className="block max-w-3xl">
+      <button
+        type="button"
+        onClick={() => openImagePreview({ url: block.url || '', title })}
+        className="block max-w-3xl text-left"
+      >
         <img
           src={block.url}
-          alt={block.label || block.text || 'Imagem do procedimento'}
+          alt={title}
           className="max-h-[420px] w-full rounded-md border border-gray-200 object-contain"
         />
-      </a>
+      </button>
     );
   }
 
@@ -277,22 +324,25 @@ function renderBlock(block: ProcedureBlock) {
   return <p className="text-sm leading-6 text-gray-700">{block.text || 'Texto do procedimento'}</p>;
 }
 
-function renderAttachment(attachment: ProcedureAttachment) {
+function renderAttachment(
+  attachment: ProcedureAttachment,
+  openImagePreview: (image: ImagePreview) => void,
+) {
   const url = getAttachmentUrl(attachment);
+  const previewUrl = getAttachmentPreviewUrl(attachment);
   const name = getAttachmentName(attachment);
 
   if (isImageAttachment(attachment) && url) {
     return (
-      <a
+      <button
         key={attachment.id}
-        href={url}
-        target="_blank"
-        rel="noreferrer"
-        className="group block overflow-hidden rounded-md border border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm"
+        type="button"
+        onClick={() => openImagePreview({ url, previewUrl, title: name })}
+        className="group block overflow-hidden rounded-md border border-gray-200 bg-white text-left hover:border-blue-300 hover:shadow-sm"
       >
         <div className="aspect-video bg-gray-50">
           <img
-            src={getAttachmentPreviewUrl(attachment)}
+            src={previewUrl}
             alt={name}
             loading="lazy"
             onError={event => {
@@ -305,7 +355,7 @@ function renderAttachment(attachment: ProcedureAttachment) {
           <Image className="h-4 w-4 text-blue-500" />
           <span className="truncate">{name}</span>
         </div>
-      </a>
+      </button>
     );
   }
 
@@ -331,6 +381,7 @@ export default function Procedures() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProcedure, setEditingProcedure] = useState<Procedure | null>(null);
   const [draft, setDraft] = useState<ProcedureDraft>(() => emptyDraft());
+  const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -714,7 +765,7 @@ export default function Procedures() {
               <div className="mt-6 space-y-4">
                 {selectedProcedure.content_blocks.map(block => (
                   <div key={block.id} className="border-l-2 border-blue-200 pl-4">
-                    {renderBlock(block)}
+                    {renderBlock(block, setImagePreview)}
                   </div>
                 ))}
               </div>
@@ -723,7 +774,9 @@ export default function Procedures() {
                 <div className="mt-8 border-t border-gray-200 pt-5">
                   <h3 className="text-sm font-semibold text-gray-950">Anexos</h3>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    {selectedProcedure.attachments.map(renderAttachment)}
+                    {selectedProcedure.attachments.map(attachment =>
+                      renderAttachment(attachment, setImagePreview),
+                    )}
                   </div>
                 </div>
               )}
@@ -1051,6 +1104,10 @@ export default function Procedures() {
             </div>
           </div>
         </div>
+      )}
+
+      {imagePreview && (
+        <ImagePreviewModal image={imagePreview} onClose={() => setImagePreview(null)} />
       )}
     </div>
   );
