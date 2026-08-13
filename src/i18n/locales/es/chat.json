@@ -85,6 +85,10 @@
       "sharedLocation": "Ubicación compartida",
       "openInMaps": "Abrir en Google Maps"
     },
+    "messageContact": {
+      "sharedContact": "Contacto compartido",
+      "unknownPhone": "Teléfono no disponible"
+    },
     "messageStatus": {
       "retryInDevelopment": "Funcionalidad de reintento en desarrollo",
       "sendFailed": "Envío fallido - Haga clic para intentar de nuevo",
