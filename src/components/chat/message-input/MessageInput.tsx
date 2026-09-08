@@ -734,6 +734,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
               onPickMedia={() => document.getElementById('composer-file-input-media')?.click()}
               onOpenConversationNote={() => setNotesMode(true)}
               onSchedule={() => setShowScheduleModal(true)}
+              scheduleDisabled={!hasTypedContent}
               onOpenTemplates={isWhatsAppCloud ? handleTemplateClick : undefined}
               // Below md, Emoji/Macros/Assinatura/IA fold into this menu instead of
               // their own always-visible icons — six icon buttons plus the text

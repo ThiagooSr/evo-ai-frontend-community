@@ -1,70 +1,147 @@
-import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import React from 'react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import MessageStatus from './MessageStatus';
+import { MESSAGE_TYPE, Message } from '@/types/chat/api';
 
-vi.mock('@/hooks/useLanguage', () => ({
-  useLanguage: () => ({
-    t: (key: string) => key,
-  }),
+type ToastOptions = { description?: string; action?: { label: string; onClick: () => void } };
+
+const toastError = vi.fn();
+const toastWarning = vi.fn();
+const toastInfo = vi.fn();
+vi.mock('sonner', () => ({
+  toast: {
+    error: (title: string, opts?: ToastOptions) => toastError(title, opts),
+    warning: (title: string, opts?: ToastOptions) => toastWarning(title, opts),
+    info: (title: string, opts?: ToastOptions) => toastInfo(title, opts),
+  },
 }));
 
-import MessageStatus from './MessageStatus';
-import type { Message } from '@/types/chat/api';
+vi.mock('@/hooks/useLanguage', () => ({
+  useLanguage: () => ({ t: (key: string) => key }),
+}));
 
-const mockMessage = (overrides: Partial<Message> = {}): Message =>
-  ({
+const META_ERROR = '131042: Business eligibility payment issue';
+
+function failedMessage(externalError?: string): Message {
+  return {
     id: 'msg-1',
-    created_at: new Date().toISOString(),
+    content: 'hi',
+    content_attributes: externalError === undefined ? {} : { external_error: externalError },
+    content_type: 'text',
+    conversation_id: 'conv-1',
+    created_at: 1_756_330_000,
+    external_source_ids: {},
+    message_type: MESSAGE_TYPE.OUTGOING,
     private: false,
+    sender: { id: 'user-1', name: 'Agent', type: 'user' },
+    source_id: 'wamid.HBgMNTU3NDk5ODc5NDA5',
     status: 'failed',
-    content_attributes: {},
-    ...overrides,
-  }) as unknown as Message;
+    attachments: [],
+  };
+}
 
-// Regression: the "failed" badge used to always show a generic "Status
-// indisponível" label, hiding the real provider error (e.g. "131026: Message
-// undeliverable") that the backend already captures in
-// content_attributes.external_error. Agents had no way to tell a bad phone
-// number apart from a retry-worthy transient failure without asking engineering.
-describe('MessageStatus — failed messages', () => {
-  it('shows a plain-language explanation for a recognized error code, not the raw code', () => {
-    render(
-      <MessageStatus
-        message={mockMessage({ content_attributes: { external_error: '131026: Message undeliverable' } })}
-        isOwn={true}
-      />,
-    );
+async function clickIndicator(message: Message, onRetry?: () => void) {
+  render(<MessageStatus message={message} isOwn onRetry={onRetry} />);
+  await userEvent.click(screen.getByRole('button'));
+}
 
-    expect(screen.getByText('O número não tem WhatsApp ativo ou não pôde ser alcançado.')).toBeInTheDocument();
-    expect(screen.queryByText('131026: Message undeliverable')).not.toBeInTheDocument();
+describe('MessageStatus — failed public message', () => {
+  beforeEach(() => {
+    toastError.mockClear();
+    toastWarning.mockClear();
+    toastInfo.mockClear();
   });
 
-  it('falls back to the raw error text when the error is not one we recognize', () => {
-    render(
-      <MessageStatus
-        message={mockMessage({ content_attributes: { external_error: '999999: Some brand-new error' } })}
-        isOwn={true}
-      />,
-    );
+  it('shows the reason the backend stored, without the generic guidance', async () => {
+    await clickIndicator(failedMessage(META_ERROR));
 
-    expect(screen.getByText('999999: Some brand-new error')).toBeInTheDocument();
+    expect(toastError).toHaveBeenCalledWith(
+      'messages.messageStatus.messageNotSent',
+      expect.objectContaining({ description: META_ERROR }),
+    );
+    expect(toastWarning).not.toHaveBeenCalled();
+    expect(toastInfo).not.toHaveBeenCalled();
   });
 
-  it('falls back to the generic retry label when no external_error was captured', () => {
-    render(<MessageStatus message={mockMessage({ content_attributes: {} })} isOwn={true} />);
+  it('labels the indicator as a send failure when the reason is known', async () => {
+    render(<MessageStatus message={failedMessage(META_ERROR)} isOwn />);
 
-    expect(screen.getByText('messages.messageStatus.tryAgain')).toBeInTheDocument();
+    const indicator = screen.getByRole('button');
+    expect(indicator).toHaveTextContent('messages.messageStatus.sendFailedText');
+    expect(indicator).toHaveAttribute('title', 'messages.messageStatus.sendFailed');
   });
 
-  it('does not render a status badge for messages that are not own', () => {
-    const { container } = render(
-      <MessageStatus
-        message={mockMessage({ content_attributes: { external_error: '131026: Message undeliverable' } })}
-        isOwn={false}
-      />,
-    );
+  it('keeps the generic guidance and its label when there is no reason', async () => {
+    render(<MessageStatus message={failedMessage()} isOwn />);
 
-    expect(screen.queryByText('O número não tem WhatsApp ativo ou não pôde ser alcançado.')).not.toBeInTheDocument();
-    expect(container.querySelector('button')).not.toBeInTheDocument();
+    const indicator = screen.getByRole('button');
+    expect(indicator).toHaveTextContent('messages.messageStatus.statusUnavailableText');
+    await userEvent.click(indicator);
+
+    expect(toastWarning).toHaveBeenCalled();
+    expect(toastInfo).toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['empty', ''],
+    ['whitespace only', '   '],
+  ])('treats a %s external_error as missing', async (_label, externalError) => {
+    await clickIndicator(failedMessage(externalError));
+
+    expect(toastWarning).toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('caps a long reason so the toast stays readable', async () => {
+    await clickIndicator(failedMessage('x'.repeat(1000)));
+
+    const description = toastError.mock.calls[0][1].description;
+    expect(description).toHaveLength(241);
+    expect(description.endsWith('…')).toBe(true);
+  });
+
+  it('does not resend on click and offers the retry as an explicit action', async () => {
+    const onRetry = vi.fn();
+    await clickIndicator(failedMessage(META_ERROR), onRetry);
+
+    expect(onRetry).not.toHaveBeenCalled();
+
+    toastError.mock.calls[0][1].action.onClick();
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers the retry action on the generic path too', async () => {
+    const onRetry = vi.fn();
+    await clickIndicator(failedMessage(), onRetry);
+
+    expect(onRetry).not.toHaveBeenCalled();
+
+    toastWarning.mock.calls[0][1].action.onClick();
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression: a raw provider error code (e.g. "131026: Message undeliverable") means
+  // nothing to a non-technical agent. Recognized codes get translated to plain language
+  // before they ever reach the toast description.
+  it('translates a recognized error code to a plain-language reason instead of the raw code', async () => {
+    await clickIndicator(failedMessage('131026: Message undeliverable'));
+
+    expect(toastError).toHaveBeenCalledWith(
+      'messages.messageStatus.messageNotSent',
+      expect.objectContaining({
+        description: 'O número não tem WhatsApp ativo ou não pôde ser alcançado.',
+      }),
+    );
+  });
+
+  it('falls back to the raw (truncated) error text when the code is not recognized', async () => {
+    await clickIndicator(failedMessage(META_ERROR));
+
+    expect(toastError).toHaveBeenCalledWith(
+      'messages.messageStatus.messageNotSent',
+      expect.objectContaining({ description: META_ERROR }),
+    );
   });
 });

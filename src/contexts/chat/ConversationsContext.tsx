@@ -16,7 +16,7 @@ import {
 
 import { chatService } from '@/services/chat/chatService';
 import { conversationAPI } from '@/services/conversations/conversationService';
-import { useUnreadConversationsStore } from '@/store/unreadConversationsStore';
+import { useUnansweredConversationsStore } from '@/store/unansweredConversationsStore';
 
 import { toast } from 'sonner';
 
@@ -404,7 +404,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
           console.warn('updateConversationStatus: Invalid response', response);
         }
 
-        useUnreadConversationsStore.getState().fetch();
+        useUnansweredConversationsStore.getState().fetch();
 
         const statusName = t(`contexts.conversations.statusNames.${status}`);
 
@@ -444,7 +444,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
           console.warn('returnConversationToBot: Invalid response', response);
         }
 
-        useUnreadConversationsStore.getState().fetch();
+        useUnansweredConversationsStore.getState().fetch();
 
         toast.success(t('contexts.conversations.success.returnedToBot'));
 
@@ -735,7 +735,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         type: 'UPDATE_UNREAD_COUNT',
         payload: { conversationId, count },
       });
-      useUnreadConversationsStore.getState().fetch();
+      useUnansweredConversationsStore.getState().fetch();
     },
     [],
   );
@@ -755,7 +755,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       type: 'INCREMENT_UNREAD_COUNT',
       payload: { conversationId },
     });
-    useUnreadConversationsStore.getState().fetch();
+    useUnansweredConversationsStore.getState().fetch();
   }, []);
 
   const addHiddenConversation = useCallback((conversation: Conversation) => {
@@ -808,7 +808,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
           type: 'UPDATE_UNREAD_COUNT',
           payload: { conversationId, count: 0 },
         });
-        useUnreadConversationsStore.getState().fetch();
+        // No badge refetch: reading does not change waiting_since.
 
         if (!options?.silent) {
           toast.success(t('contexts.conversations.success.markedAsRead'));
@@ -839,7 +839,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
           type: 'UPDATE_UNREAD_COUNT',
           payload: { conversationId, count: Math.max(1, currentCount) },
         });
-        useUnreadConversationsStore.getState().fetch();
+        // No badge refetch: unread and unanswered are distinct axes.
 
         if (!options?.silent) {
           toast.success(t('contexts.conversations.success.markedAsUnread'));
@@ -875,7 +875,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
           console.warn('Invalid updatedConversation', updatedConversation);
         }
 
-        useUnreadConversationsStore.getState().fetch();
+        useUnansweredConversationsStore.getState().fetch();
 
         toast.success(t('contexts.conversations.success.markedAsResolved'));
       } catch (error) {
@@ -933,6 +933,10 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
           type: 'UPDATE_CONVERSATION',
           payload: updatedConversation as unknown as Conversation,
         });
+
+        // Assignment moves a conversation in and out of "mine".
+        useUnansweredConversationsStore.getState().fetch();
+
         toast.success(
           assigneeId
             ? t('contexts.conversations.success.agentAssigned')

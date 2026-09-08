@@ -111,6 +111,8 @@
       "customAttributes": "Attributs Personnalisés",
       "cannedResponses": "Réponses Rapides",
       "procedures": "Procédures",
+      "aiCredentials": "Identifiants d'IA",
+      "integrationCredentials": "Identifiants d'intégration",
       "messageTemplates": "Modèles de Message",
       "macros": "Macros",
       "templates": "Modèles",

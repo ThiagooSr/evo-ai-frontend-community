@@ -29,6 +29,8 @@ interface ComposerPlusMenuProps {
   onPickMedia: () => void;
   onOpenConversationNote: () => void;
   onSchedule: () => void;
+  /** Agendar exige mensagem já digitada no composer (o modal só lê o conteúdo, não tem campo próprio). */
+  scheduleDisabled?: boolean;
   /** WhatsApp Cloud templates — sem equivalente no protótipo, mantido como 6º item quando disponível. */
   onOpenTemplates?: () => void;
   /**
@@ -62,6 +64,7 @@ const ComposerPlusMenu: React.FC<ComposerPlusMenuProps> = ({
   onPickMedia,
   onOpenConversationNote,
   onSchedule,
+  scheduleDisabled = false,
   onOpenTemplates,
   mobileExtraActions,
 }) => {
@@ -87,7 +90,16 @@ const ComposerPlusMenu: React.FC<ComposerPlusMenuProps> = ({
     };
   }, [open]);
 
-  const items = [
+  type MenuItem = {
+    key: string;
+    label: string;
+    icon: React.ReactNode;
+    onClick: () => void;
+    disabled?: boolean;
+    disabledTitle?: string;
+  };
+
+  const items: MenuItem[] = [
     {
       key: 'rapidas',
       label: t('messageInput.composerMenu.quickReplies'),
@@ -117,6 +129,8 @@ const ComposerPlusMenu: React.FC<ComposerPlusMenuProps> = ({
       label: t('messageInput.composerMenu.schedule'),
       icon: <CalendarClock className="h-4 w-4" />,
       onClick: onSchedule,
+      disabled: scheduleDisabled,
+      disabledTitle: t('messageInput.composerMenu.scheduleDisabledHint'),
     },
     ...(onOpenTemplates
       ? [
@@ -201,10 +215,15 @@ const ComposerPlusMenu: React.FC<ComposerPlusMenuProps> = ({
           }}
         >
           {items.map(item => {
-            const itemDisabled = restrictToTemplatesOnly && item.key !== 'templates';
+            // Two independent reasons an item can be greyed out: the whole menu (bar
+            // "templates") when the 24h WhatsApp window expired, or just this one item
+            // (e.g. "schedule" with nothing typed yet) via its own `disabled` flag.
+            const itemDisabled =
+              (restrictToTemplatesOnly && item.key !== 'templates') || Boolean(item.disabled);
             return (
               <div
                 key={item.key}
+                title={item.disabled ? item.disabledTitle : undefined}
                 onClick={() => {
                   if (itemDisabled) return;
                   setOpen(false);
@@ -217,7 +236,7 @@ const ComposerPlusMenu: React.FC<ComposerPlusMenuProps> = ({
                   padding: '9px 10px',
                   borderRadius: 10,
                   cursor: itemDisabled ? 'not-allowed' : 'pointer',
-                  opacity: itemDisabled ? 0.4 : 1,
+                  opacity: itemDisabled ? 0.5 : 1,
                 }}
                 onMouseEnter={e => {
                   if (!itemDisabled) e.currentTarget.style.background = '#f4f6f9';

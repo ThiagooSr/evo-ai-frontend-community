@@ -17,6 +17,9 @@ interface MessageStatusProps {
   variant?: 'default' | 'tuck';
 }
 
+// SendReplyJob truncates its generic rescue to 1000 chars, which is unreadable in a toast.
+const MAX_FAILURE_REASON_CHARS = 240;
+
 const MessageStatus: React.FC<MessageStatusProps> = ({ message, isOwn, onRetry, variant = 'default' }) => {
   const { t } = useLanguage('chat');
 
@@ -26,6 +29,21 @@ const MessageStatus: React.FC<MessageStatusProps> = ({ message, isOwn, onRetry, 
   const isOnColoredBubble = isOwn && !message.private;
   const timeTextClass = isOnColoredBubble ? 'text-white/70' : 'text-muted-foreground';
 
+  // Every channel service writes external_error, and so does SendReplyJob's generic rescue —
+  // the text may be a provider rejection or an internal exception. Show it, never name a source.
+  const rawExternalError = message.content_attributes?.external_error;
+  const trimmedError = typeof rawExternalError === 'string' ? rawExternalError.trim() : '';
+  // The raw provider text (or internal rescue message) means nothing to a non-technical
+  // agent, so translate the ones we recognize (e.g. "131026: Message undeliverable" ->
+  // "O número não tem WhatsApp ativo...") into plain language before it ever reaches the
+  // toast. Unrecognized errors still show up, just truncated and untranslated.
+  const friendlyError = getFriendlyDeliveryError(trimmedError || undefined);
+  const failureReason = friendlyError
+    ? friendlyError
+    : trimmedError.length > MAX_FAILURE_REASON_CHARS
+      ? `${trimmedError.slice(0, MAX_FAILURE_REASON_CHARS)}…`
+      : trimmedError;
+
   const getStatusIcon = () => {
     if (!isOwn) return null;
 
@@ -33,6 +51,53 @@ const MessageStatus: React.FC<MessageStatusProps> = ({ message, isOwn, onRetry, 
     if (message.private) {
       // Mensagens privadas são sempre "bem-sucedidas" (salvas no banco)
       return <Check className="h-3 w-3 text-muted-foreground" />;
+    }
+
+    if (message.status === 'failed' && !message.private) {
+      // Resending is an explicit choice: clicking the indicator only explains the failure.
+      const retryAction = onRetry
+        ? { label: t('messages.messageStatus.tryAgain'), onClick: () => onRetry() }
+        : undefined;
+
+      return (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-auto p-0 text-orange-500 hover:text-orange-600"
+          onClick={e => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (failureReason) {
+              toast.error(t('messages.messageStatus.messageNotSent'), {
+                description: failureReason,
+                action: retryAction,
+              });
+              return;
+            }
+
+            toast.warning(t('messages.messageStatus.statusUnavailable'), {
+              description: t('messages.messageStatus.statusUnavailableDescription'),
+              action: retryAction,
+            });
+            toast.info(t('messages.messageStatus.checkChannelConfig'), {
+              description: t('messages.messageStatus.webhookIssue'),
+            });
+          }}
+          title={
+            failureReason
+              ? t('messages.messageStatus.sendFailed')
+              : t('messages.messageStatus.deliveryStatusUnavailable')
+          }
+        >
+          <AlertCircle className="h-3 w-3" />
+          <span className="ml-1 text-xs">
+            {failureReason
+              ? t('messages.messageStatus.sendFailedText')
+              : t('messages.messageStatus.statusUnavailableText')}
+          </span>
+        </Button>
+      );
     }
 
     switch (message.status) {
@@ -46,40 +111,8 @@ const MessageStatus: React.FC<MessageStatusProps> = ({ message, isOwn, onRetry, 
         return <CheckCheck className="h-3 w-3 text-primary" />;
       case 'progress':
         return <Loader2 className="h-3 w-3 text-blue-500 animate-spin" />;
-      case 'failed': {
-        // The backend already captures the real provider error (e.g. "131026: Message
-        // undeliverable") in content_attributes.external_error. A raw error code means
-        // nothing to a non-technical agent, so translate the ones we recognize into
-        // plain language and show THAT as the label — the raw code stays available in
-        // the tooltip for anyone who wants the technical detail.
-        const externalError = message.content_attributes?.external_error;
-        const friendlyError = getFriendlyDeliveryError(externalError);
-        const displayText = friendlyError || externalError || t('messages.messageStatus.tryAgain');
-        const titleText = externalError
-          ? friendlyError
-            ? `${friendlyError} (${externalError})`
-            : `${t('messages.messageStatus.sendFailed')}: ${externalError}`
-          : t('messages.messageStatus.sendFailed');
-
-        return (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-auto p-0 max-w-[240px] text-destructive hover:text-destructive/80"
-            onClick={() => {
-              if (onRetry) {
-                onRetry();
-              } else {
-                toast.error(t('messages.messageStatus.retryInDevelopment'));
-              }
-            }}
-            title={titleText}
-          >
-            <AlertCircle className="h-3 w-3 flex-shrink-0" />
-            <span className="ml-1 text-xs truncate">{displayText}</span>
-          </Button>
-        );
-      }
+      // 'failed' never reaches here: private messages return above, public ones are
+      // handled by the branch before the switch.
       default:
         return <Clock className="h-3 w-3 text-muted-foreground animate-pulse" />;
     }

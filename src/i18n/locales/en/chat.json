@@ -80,7 +80,8 @@
     "messageList": {
       "loadingConversation": "Loading conversation...",
       "loadingPrevious": "Loading previous messages...",
-      "conversationStart": "Start of conversation"
+      "conversationStart": "Start of conversation",
+      "newMessage": "New message"
     },
     "messageLocation": {
       "sharedLocation": "Shared location",
@@ -91,8 +92,15 @@
       "unknownPhone": "Phone number not available"
     },
     "messageStatus": {
-      "retryInDevelopment": "Retry functionality in development",
-      "sendFailed": "Send failed - Click to try again",
+      "statusUnavailable": "Message status unavailable",
+      "statusUnavailableDescription": "The message was sent, but we could not confirm the delivery status.",
+      "checkChannelConfig": "Check channel configuration",
+      "webhookIssue": "The webhook may be outdated or inactive.",
+      "messageNotSent": "The message was not sent",
+      "deliveryStatusUnavailable": "Delivery status unavailable - Click for more details",
+      "statusUnavailableText": "Status unavailable",
+      "sendFailedText": "Send failed",
+      "sendFailed": "Send failed - Click to see the reason",
       "tryAgain": "Try again"
     },
     "replyPreview": {
@@ -318,6 +326,7 @@
     },
     "openConversation": "Open Conversation",
     "closeConversation": "Close conversation",
+    "backToConversations": "Back to conversations",
     "phoneNumber": "Phone number",
     "openContactPanel": "Open contact details",
     "closeContactPanel": "Close contact details"
@@ -329,6 +338,7 @@
       "pending": "Pending",
       "resolved": "Completed",
       "unread": "Unread",
+      "unanswered": "Unanswered",
       "groups": "Groups"
     },
     "searchPlaceholder": "Search conversations...",
@@ -775,7 +785,8 @@
       "documents": "Documents",
       "media": "Photos and Videos",
       "conversationNote": "Conversation Notes",
-      "schedule": "Schedule",
+      "schedule": "Schedule Message",
+      "scheduleDisabledHint": "Type a message to schedule it",
       "emoji": "Emoji"
     },
     "macros": {
@@ -785,7 +796,7 @@
     "schedule": {
       "title": "Schedule message",
       "messagePreview": "Message",
-      "emptyMessage": "Type a message in the composer before scheduling.",
+      "emptyMessage": "No message typed to schedule.",
       "dateTime": "Date and time",
       "note": "Note",
       "notePlaceholder": "Internal note (optional)",
@@ -1056,10 +1067,12 @@
     "moveError": "Error moving to stage",
     "removeError": "Error removing from pipeline"
   },
+  "unansweredBadge": {
+    "menuAriaLabel_one": "{{count}} conversation awaiting your reply",
+    "menuAriaLabel_other": "{{count}} conversations awaiting your reply"
+  },
   "unreadBadge": {
     "ariaLabel_one": "{{count}} unread message",
-    "ariaLabel_other": "{{count}} unread messages",
-    "menuAriaLabel_one": "{{count}} unread conversation",
-    "menuAriaLabel_other": "{{count}} unread conversations"
+    "ariaLabel_other": "{{count}} unread messages"
   }
 }

@@ -33,6 +33,7 @@ import PublicProcedure from '@/pages/Public/Procedures';
 // Páginas customer
 import Dashboard from '@/pages/Customer/Dashboard';
 import Agents from '@/pages/Customer/Agents';
+import AgentsIndexRedirect from '@/components/agents/AgentsIndexRedirect';
 import AgentEditPage from '@/pages/Customer/Agents/Agent/AgentEditPage';
 import MCPServers from '@/pages/Customer/Agents/MCPServers';
 import CustomMCPServers from '@/pages/Customer/Agents/CustomMCPServers';
@@ -63,6 +64,8 @@ import Campaigns from '@/pages/Customer/Campaigns/Campaigns';
 import NewCampaign from '@/pages/Customer/Campaigns/NewCampaign/NewCampaign';
 import CannedResponses from '@/pages/Customer/Settings/CannedResponses';
 import Procedures from '@/pages/Customer/Settings/Procedures';
+import AiCredentials from '@/pages/Customer/Settings/AiCredentials';
+import IntegrationCredentials from '@/pages/Customer/Settings/IntegrationCredentials';
 import MessageTemplates from '@/pages/Customer/Settings/MessageTemplates';
 import { Macros } from '@/pages/Customer/Settings/Macros';
 import Products, { ProductsImport } from '@/pages/Customer/Settings/Products';
@@ -711,7 +714,7 @@ const AppRouter = () => {
               <PrivateRoute>
                 <CustomerRoute>
                   <MainLayout>
-                    <PermissionRoute resource="teams" action="read">
+                    <PermissionRoute resource="teams" action="manage">
                       <Teams />
                     </PermissionRoute>
                   </MainLayout>
@@ -726,7 +729,7 @@ const AppRouter = () => {
               <PrivateRoute>
                 <CustomerRoute>
                   <MainLayout>
-                    <PermissionRoute resource="teams" action="create">
+                    <PermissionRoute resource="teams" action="manage">
                       <AddUsers />
                     </PermissionRoute>
                   </MainLayout>
@@ -756,7 +759,13 @@ const AppRouter = () => {
               <PrivateRoute>
                 <CustomerRoute>
                   <MainLayout>
-                    <PermissionRoute resource="custom_attribute_definitions" action="read">
+                    <PermissionRoute
+                      permissions={[
+                        'custom_attribute_definitions.create',
+                        'custom_attribute_definitions.update',
+                        'custom_attribute_definitions.delete',
+                      ]}
+                    >
                       <CustomAttributes />
                     </PermissionRoute>
                   </MainLayout>
@@ -796,12 +805,42 @@ const AppRouter = () => {
           />
 
           <Route
+            path="/settings/ai-credentials"
+            element={
+              <PrivateRoute>
+                <CustomerRoute>
+                  <MainLayout>
+                    <PermissionRoute resource="ai_api_keys" action="read">
+                      <AiCredentials />
+                    </PermissionRoute>
+                  </MainLayout>
+                </CustomerRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/settings/integration-credentials"
+            element={
+              <PrivateRoute>
+                <CustomerRoute>
+                  <MainLayout>
+                    <PermissionRoute resource="ai_integration_credentials" action="read">
+                      <IntegrationCredentials />
+                    </PermissionRoute>
+                  </MainLayout>
+                </CustomerRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
             path="/settings/message-templates"
             element={
               <PrivateRoute>
                 <CustomerRoute>
                   <MainLayout>
-                    <PermissionRoute resource="message_templates" action="read">
+                    <PermissionRoute resource="message_templates" action="manage">
                       <MessageTemplates />
                     </PermissionRoute>
                   </MainLayout>
@@ -876,7 +915,7 @@ const AppRouter = () => {
               <PrivateRoute>
                 <CustomerRoute>
                   <MainLayout>
-                    <PermissionRoute resource="macros" action="read">
+                    <PermissionRoute resource="macros" action="manage">
                       <Macros />
                     </PermissionRoute>
                   </MainLayout>
@@ -1176,7 +1215,7 @@ const AppRouter = () => {
               <PrivateRoute>
                 <CustomerRoute>
                   <MainLayout>
-                    <PermissionRoute resource="message_templates" action="create">
+                    <PermissionRoute resource="message_templates" action="manage">
                       <EmailTemplateEditor />
                     </PermissionRoute>
                   </MainLayout>
@@ -1185,8 +1224,7 @@ const AppRouter = () => {
             }
           />
 
-          {/* Rota principal de agents redireciona para /agents/list */}
-          <Route path="/agents" element={<Navigate to="/agents/list" replace />} />
+          <Route path="/agents" element={<AgentsIndexRedirect />} />
 
           {/* Lista de agentes */}
           <Route
