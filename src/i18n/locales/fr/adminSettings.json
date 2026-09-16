@@ -1,11 +1,45 @@
 {
   "title": "Parametres Admin",
   "navigation": {
+    "branding": "Image de marque",
     "email": "E-mail",
     "storage": "Stockage",
     "channels": "Canaux",
     "openai": "OpenAI",
     "integrations": "Integrations"
+  },
+  "branding": {
+    "title": "Image de marque",
+    "description": "Personnalisez le nom, la couleur principale et le logo affichés dans le système.",
+    "fields": {
+      "name": "Nom du système",
+      "primaryColor": "Couleur principale",
+      "logo": "Logo",
+      "favicon": "Favicon"
+    },
+    "placeholders": {
+      "name": "Evo CRM"
+    },
+    "help": {
+      "name": "Affiché dans l'onglet du navigateur et sur l'écran de connexion.",
+      "primaryColor": "Utilisée pour les boutons, liens et éléments mis en avant.",
+      "logo": "Recommandé : PNG à fond transparent ou SVG, au moins 800x200px.",
+      "favicon": "Recommandé : PNG carré, 512x512px."
+    },
+    "upload": {
+      "logo": "Téléverser le logo",
+      "favicon": "Téléverser le favicon"
+    },
+    "uploading": "Téléversement...",
+    "resetColor": "Réinitialiser",
+    "save": "Enregistrer",
+    "saving": "Enregistrement...",
+    "messages": {
+      "loadError": "Échec du chargement des paramètres de marque.",
+      "saveSuccess": "Paramètres de marque enregistrés.",
+      "saveError": "Échec de l'enregistrement des paramètres de marque.",
+      "uploadError": "Échec de l'envoi de l'image."
+    }
   },
   "email": {
     "title": "Configuration E-mail",

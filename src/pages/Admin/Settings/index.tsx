@@ -1,8 +1,9 @@
 import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '@/hooks/useLanguage';
-import { Mail, HardDrive, MessageSquare, Sparkles, Puzzle, Cable } from 'lucide-react';
+import { Mail, HardDrive, MessageSquare, Sparkles, Puzzle, Cable, Palette } from 'lucide-react';
 
 const navItems = [
+  { key: 'branding', path: '/settings/admin/branding', icon: Palette },
   { key: 'email', path: '/settings/admin/email', icon: Mail },
   { key: 'storage', path: '/settings/admin/storage', icon: HardDrive },
   { key: 'channels', path: '/settings/admin/channels', icon: MessageSquare },

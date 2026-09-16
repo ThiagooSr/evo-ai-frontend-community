@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { api } from '@/services/core';
 import { setupService } from '@/services/setup/setupService';
 import { initClarity } from '@/utils/clarityUtils';
+import { applyBranding } from '@/utils/brandingUtils';
 
 export interface GlobalConfig {
   fbAppId?: string;
@@ -30,6 +31,13 @@ export interface GlobalConfig {
   enableAccountSignup?: boolean;
   recaptchaSiteKey?: string;
   clarityProjectId?: string;
+  // Installation branding (/settings/admin/branding). Public by design — read
+  // before login, on the login screen and the browser tab. Absent/empty means
+  // "use the stock Evo CRM look" (see brandingUtils.applyBranding defaults).
+  brandName?: string;
+  brandPrimaryColor?: string;
+  brandLogoUrl?: string;
+  brandFaviconUrl?: string;
 }
 
 interface GlobalConfigContextValue extends GlobalConfig {
@@ -151,6 +159,10 @@ export const GlobalConfigProvider: React.FC<{ children: React.ReactNode }> = ({ 
           if (configData.clarityProjectId) {
             initClarity(configData.clarityProjectId);
           }
+          // Apply installation branding (title, favicon, primary color) —
+          // runs on every load, including a re-fetch right after the admin
+          // saves new branding (see refreshGlobalConfig / onGlobalConfigCleared).
+          applyBranding(configData);
         }
       });
     };

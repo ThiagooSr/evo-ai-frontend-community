@@ -1,11 +1,45 @@
 {
   "title": "Configuracoes do Admin",
   "navigation": {
+    "branding": "Marca",
     "email": "E-mail",
     "storage": "Armazenamento",
     "channels": "Canais",
     "openai": "OpenAI",
     "integrations": "Integrações"
+  },
+  "branding": {
+    "title": "Marca",
+    "description": "Personalize o nome, a cor principal e o logótipo exibidos no sistema.",
+    "fields": {
+      "name": "Nome do sistema",
+      "primaryColor": "Cor principal",
+      "logo": "Logótipo",
+      "favicon": "Favicon"
+    },
+    "placeholders": {
+      "name": "Evo CRM"
+    },
+    "help": {
+      "name": "Aparece no separador do navegador e no ecrã de início de sessão.",
+      "primaryColor": "Utilizada em botões, ligações e destaques do sistema.",
+      "logo": "Recomendado: PNG com fundo transparente ou SVG, no mínimo 800x200px.",
+      "favicon": "Recomendado: PNG quadrado, 512x512px."
+    },
+    "upload": {
+      "logo": "Carregar logótipo",
+      "favicon": "Carregar favicon"
+    },
+    "uploading": "A carregar...",
+    "resetColor": "Repor",
+    "save": "Guardar",
+    "saving": "A guardar...",
+    "messages": {
+      "loadError": "Falha ao carregar as configurações de marca.",
+      "saveSuccess": "Configurações de marca guardadas.",
+      "saveError": "Falha ao guardar as configurações de marca.",
+      "uploadError": "Falha ao carregar a imagem."
+    }
   },
   "email": {
     "title": "Configuracao de E-mail",

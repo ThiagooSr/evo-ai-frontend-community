@@ -1,11 +1,45 @@
 {
   "title": "Impostazioni Admin",
   "navigation": {
+    "branding": "Branding",
     "email": "E-mail",
     "storage": "Archiviazione",
     "channels": "Canali",
     "openai": "OpenAI",
     "integrations": "Integrazioni"
+  },
+  "branding": {
+    "title": "Branding",
+    "description": "Personalizza il nome, il colore principale e il logo mostrati nel sistema.",
+    "fields": {
+      "name": "Nome del sistema",
+      "primaryColor": "Colore principale",
+      "logo": "Logo",
+      "favicon": "Favicon"
+    },
+    "placeholders": {
+      "name": "Evo CRM"
+    },
+    "help": {
+      "name": "Visualizzato nella scheda del browser e nella schermata di accesso.",
+      "primaryColor": "Usato per pulsanti, link ed elementi in evidenza.",
+      "logo": "Consigliato: PNG con sfondo trasparente o SVG, almeno 800x200px.",
+      "favicon": "Consigliato: PNG quadrato, 512x512px."
+    },
+    "upload": {
+      "logo": "Carica logo",
+      "favicon": "Carica favicon"
+    },
+    "uploading": "Caricamento...",
+    "resetColor": "Ripristina",
+    "save": "Salva",
+    "saving": "Salvataggio...",
+    "messages": {
+      "loadError": "Impossibile caricare le impostazioni di branding.",
+      "saveSuccess": "Impostazioni di branding salvate.",
+      "saveError": "Impossibile salvare le impostazioni di branding.",
+      "uploadError": "Impossibile caricare l'immagine."
+    }
   },
   "email": {
     "title": "Configurazione E-mail",

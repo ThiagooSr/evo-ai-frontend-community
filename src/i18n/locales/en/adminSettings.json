@@ -1,12 +1,46 @@
 {
   "title": "Admin Settings",
   "navigation": {
+    "branding": "Branding",
     "email": "Email",
     "storage": "Storage",
     "channels": "Channels",
     "openai": "OpenAI",
     "integrations": "Integrations",
     "evolutionHub": "Evo Hub"
+  },
+  "branding": {
+    "title": "Branding",
+    "description": "Customize the name, primary color and logo shown across the system.",
+    "fields": {
+      "name": "System name",
+      "primaryColor": "Primary color",
+      "logo": "Logo",
+      "favicon": "Favicon"
+    },
+    "placeholders": {
+      "name": "Evo CRM"
+    },
+    "help": {
+      "name": "Shown in the browser tab and the login screen.",
+      "primaryColor": "Used for buttons, links and highlights across the system.",
+      "logo": "Recommended: transparent PNG or SVG, at least 800x200px.",
+      "favicon": "Recommended: square PNG, 512x512px."
+    },
+    "upload": {
+      "logo": "Upload logo",
+      "favicon": "Upload favicon"
+    },
+    "uploading": "Uploading...",
+    "resetColor": "Reset",
+    "save": "Save",
+    "saving": "Saving...",
+    "messages": {
+      "loadError": "Failed to load branding settings.",
+      "saveSuccess": "Branding settings saved.",
+      "saveError": "Failed to save branding settings.",
+      "uploadError": "Failed to upload image."
+    }
   },
   "email": {
     "title": "Email Configuration",
