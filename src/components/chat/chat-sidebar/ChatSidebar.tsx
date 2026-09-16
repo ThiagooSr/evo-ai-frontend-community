@@ -564,7 +564,24 @@ const ChatSidebar = ({
 
   const [tabCounts, setTabCounts] = useState({ open: 0, pending: 0, resolved: 0 });
 
+  // Stable signature of only the fields that can move a conversation between
+  // tab counts (status/assignee). The loaded conversations array gets a new
+  // reference on every websocket update — new message, typing indicator, read
+  // receipt, label change, etc. — none of which change the counts. Depending
+  // on that array directly re-fires the 3 /conversations/meta calls below on
+  // every such update; depending on this derived string instead means the
+  // effect only reacts to changes that can plausibly move the counts.
+  const conversationsCountSignature = useMemo(
+    () =>
+      conversations.state.conversations
+        .map(c => `${c.id}:${c.status}:${c.assignee_id ?? ''}`)
+        .join('|'),
+    [conversations.state.conversations]
+  );
+
   useEffect(() => {
+    let cancelled = false;
+
     const fetchCounts = async () => {
       try {
         const assigneeFilter = filters.state.activeFilters.find(f => f.attribute_key === 'assignee_id');
@@ -594,19 +611,28 @@ const ChatSidebar = ({
           api.get('/conversations/meta', { params: { status: 'pending', ...extraParams } }),
           api.get('/conversations/meta', { params: { status: 'resolved', ...extraParams } })
         ]);
-        
+
+        if (cancelled) return;
+
         setTabCounts({
           open: extractCount(openRes.data?.data?.count || openRes.data?.meta),
           pending: extractCount(pendingRes.data?.data?.count || pendingRes.data?.meta),
           resolved: extractCount(resolvedRes.data?.data?.count || resolvedRes.data?.meta)
         });
       } catch (err) {
-        console.error('Failed to fetch conversation counts:', err);
+        if (!cancelled) console.error('Failed to fetch conversation counts:', err);
       }
     };
-    
-    fetchCounts();
-  }, [conversations.state.conversations, filters.state.activeFilters]);
+
+    // Debounce: several conversations can change status/assignee in quick
+    // succession (bulk actions, multiple agents updating at once) — coalesce
+    // those into a single refetch instead of one per change.
+    const timer = setTimeout(fetchCounts, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [conversationsCountSignature, filters.state.activeFilters]);
 
   const pagination = conversations.state.conversationsPagination;
   const currentPage = pagination?.page || 1;
