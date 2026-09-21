@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useCallback, useMemo, useRef } from 'react';
+import { REALTIME_RESYNC_EVENT } from '@/services/chat/websocket/realtimeResync';
 import { toast } from 'sonner';
 import { usePersistence } from '@/hooks/chat/usePersistence';
 import { useContactUpdatedReconciler } from '@/hooks/chat/useContactUpdatedReconciler';
@@ -599,6 +600,31 @@ function useChatIntegration() {
     shouldReloadMessageForMissingImageData,
     reconcileContactUpdated,
   ]);
+
+  // Ressincronização após lacuna de tempo real (queda do socket, aba em segundo
+  // plano, internet que voltou): o ActionCable não reenvia eventos perdidos, então
+  // rebuscamos a conversa aberta e a lista pela API.
+  const resyncRef = useRef({ conversations, messages });
+  resyncRef.current = { conversations, messages };
+  const lastResyncAtRef = useRef(0);
+  useEffect(() => {
+    const handleResync = () => {
+      const now = Date.now();
+      // Vários sockets/eventos podem disparar juntos: um resync a cada 3s no máximo
+      if (now - lastResyncAtRef.current < 3000) return;
+      lastResyncAtRef.current = now;
+
+      const { conversations: convs, messages: msgs } = resyncRef.current;
+      const selectedId = convs.state.selectedConversationId;
+      if (selectedId) {
+        msgs.loadMessages(String(selectedId)).catch(() => {});
+      }
+      convs.refreshConversations().catch(() => {});
+    };
+
+    window.addEventListener(REALTIME_RESYNC_EVENT, handleResync);
+    return () => window.removeEventListener(REALTIME_RESYNC_EVENT, handleResync);
+  }, []);
 
   // Integrated actions
   const loadConversationsWithFilters = useCallback(

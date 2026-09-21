@@ -35,7 +35,9 @@ export class BaseActionCableConnector {
   protected websocketURL?: string;
   protected reconnectAttempts = 0;
 
-  static isDisconnected = false;
+  // Estado por instância: cada aba abre mais de um connector (chat + notificações);
+  // uma flag estática fazia o disconnect de um marcar o outro como caído.
+  protected socketDown = false;
 
   constructor(connectionParams: ConnectionParams, websocketHost?: string) {
     this.connectionParams = connectionParams;
@@ -72,8 +74,10 @@ export class BaseActionCableConnector {
 
           // Conectado com sucesso
           connected: () => {
-            const wasReconnecting = this.reconnectAttempts > 0;
-            BaseActionCableConnector.isDisconnected = false;
+            // O ActionCable também reconecta sozinho (sem passar pelo nosso timer),
+            // então reconnectAttempts pode ser 0 mesmo após uma queda: usar socketDown.
+            const wasReconnecting = this.reconnectAttempts > 0 || this.socketDown;
+            this.socketDown = false;
             this.reconnectAttempts = 0;
             this.onConnected();
             this.startPresenceInterval();
@@ -85,7 +89,7 @@ export class BaseActionCableConnector {
 
           // Desconectado
           disconnected: () => {
-            BaseActionCableConnector.isDisconnected = true;
+            this.socketDown = true;
             this.onDisconnected();
             this.stopPresenceInterval();
             this.initReconnectTimer();
@@ -199,7 +203,7 @@ export class BaseActionCableConnector {
    * Chamado pelo timer de reconexão.
    */
   protected checkConnection(): void {
-    if (!BaseActionCableConnector.isDisconnected) {
+    if (!this.socketDown) {
       // Conexão restaurada — nada a fazer (onReconnected já foi chamado
       // pelo callback connected: via wasReconnecting)
       this.clearReconnectTimer();
@@ -244,7 +248,7 @@ export class BaseActionCableConnector {
     this.stopPresenceInterval();
 
     const updatePresence = () => {
-      if (this.subscription && !BaseActionCableConnector.isDisconnected) {
+      if (this.subscription && !this.socketDown) {
         this.perform('update_presence');
       }
 
@@ -294,7 +298,30 @@ export class BaseActionCableConnector {
    * Verificar se está conectado
    */
   public isConnected(): boolean {
-    return !!this.subscription && !BaseActionCableConnector.isDisconnected;
+    if (!this.subscription || this.socketDown) return false;
+
+    // Além da flag, consultar o estado real do WebSocket (a flag não muda em
+    // conexões "zumbi" que o navegador ainda não percebeu que caíram).
+    const connection = (
+      this.consumer as unknown as { connection?: { isOpen?: () => boolean } }
+    ).connection;
+    if (connection && typeof connection.isOpen === 'function') {
+      return connection.isOpen();
+    }
+    return true;
+  }
+
+  /**
+   * Garantir que o socket está vivo (chamado quando a aba volta ou a internet volta).
+   * Zera o contador de tentativas (que pode ter desistido) e reconecta se necessário.
+   */
+  public ensureConnected(): void {
+    this.reconnectAttempts = 0;
+    if (this.isConnected()) return;
+
+    this.socketDown = true;
+    this.clearReconnectTimer();
+    this.attemptReconnect();
   }
 
   /**
@@ -313,7 +340,7 @@ export class BaseActionCableConnector {
       this.consumer.disconnect();
     }
 
-    BaseActionCableConnector.isDisconnected = true;
+    this.socketDown = true;
   }
 
   /**

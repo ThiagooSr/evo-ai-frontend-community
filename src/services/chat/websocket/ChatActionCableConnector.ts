@@ -1,5 +1,6 @@
 import { BaseActionCableConnector, ConnectionParams } from './BaseActionCableConnector';
 import { toast } from 'sonner';
+import { requestRealtimeResync } from './realtimeResync';
 
 export interface ChatEventHandlers {
   onMessageCreated?: (data: MessageCreatedEvent) => void;
@@ -613,6 +614,8 @@ export class ChatActionCableConnector extends BaseActionCableConnector {
    */
   protected onReconnected(): void {
     super.onReconnected();
+    // Mensagens enviadas durante a queda não são reenviadas pelo ActionCable.
+    requestRealtimeResync('reconnected');
     toast.success('Conexão em tempo real reestabelecida', {
       description: 'Agora você receberá mensagens em tempo real novamente.',
     });

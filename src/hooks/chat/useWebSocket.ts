@@ -4,6 +4,7 @@ import {
   ChatEventHandlers,
 } from '@/services/chat/websocket/ChatActionCableConnector';
 import { ConnectionParams } from '@/services/chat/websocket/BaseActionCableConnector';
+import { useSocketLiveness } from './useSocketLiveness';
 
 export interface UseWebSocketOptions {
   enabled?: boolean;
@@ -216,24 +217,10 @@ export const useWebSocket = (
   }, [enabled, isConnected]);
 
   /**
-   * Reconectar quando a aba ganha foco (usuário voltou)
+   * Ao voltar para a aba / voltar a internet: garantir o socket e ressincronizar
+   * os dados (o ActionCable não reenvia o que foi perdido durante a ausência).
    */
-  useEffect(() => {
-    if (!enabled) return;
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden && connectorRef.current && !isConnected) {
-        setTimeout(() => {
-          if (connectorRef.current && !connectorRef.current.isConnected()) {
-            reconnect();
-          }
-        }, 1000);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [enabled, isConnected, reconnect]);
+  useSocketLiveness(() => connectorRef.current, enabled, { resync: true });
 
   useEffect(() => {
     const handleAuthLost = () => {

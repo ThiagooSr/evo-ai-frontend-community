@@ -164,13 +164,10 @@ class ActionCableService {
   isConnected(): boolean {
     if (!this.consumer) return false;
 
-    // Check if any subscription is connected
-    for (const subscription of this.subscriptions.values()) {
-      if (subscription && (subscription as any).consumer) {
-        return true;
-      }
-    }
-    return false;
+    // `subscription.consumer` existe sempre (mesmo com o socket caído); o estado
+    // real está na conexão do consumer.
+    const connection = (this.consumer as any).connection;
+    return typeof connection?.isOpen === 'function' ? connection.isOpen() : false;
   }
 
   updateUserPresence(status: 'online' | 'offline' | 'busy') {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChatActionCableConnector, type ChatEventHandlers, type ConnectionParams } from '@/services/chat';
+import { useSocketLiveness } from '@/hooks/chat/useSocketLiveness';
 
 interface GlobalWebSocketHandlers {
   onMessageCreated?: (data: unknown) => void;
@@ -90,6 +91,10 @@ export const useGlobalWebSocket = (handlers: GlobalWebSocketHandlers) => {
       disconnect();
     };
   }, [user?.id, user?.pubsub_token, connect, disconnect]);
+
+  // Socket de notificações: só garante a conexão (a ressincronização de dados
+  // é disparada pelo socket do chat, evitando requisições duplicadas).
+  useSocketLiveness(() => connectorRef.current, !!user?.id, { resync: false });
 
   useEffect(() => {
     const handleAuthLost = () => {

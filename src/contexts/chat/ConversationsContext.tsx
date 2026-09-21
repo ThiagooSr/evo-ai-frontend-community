@@ -234,6 +234,30 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     await loadConversations({ ...query.params, page: nextPage });
   }, [state.conversationsPagination, state.conversationsLoading, loadConversations, t]);
 
+  // Rebusca silenciosamente a 1ª página da consulta atual e mescla na lista
+  // (sem loading nem perder as páginas já carregadas). Usado para recuperar
+  // eventos de tempo real perdidos durante uma queda do socket.
+  const refreshConversations = useCallback(async () => {
+    if (loadingRef.current) return;
+
+    const query = currentQueryRef.current;
+    try {
+      const response =
+        query.kind === 'filter'
+          ? await chatService.filterConversations({ ...query.request, page: 1 })
+          : await chatService.getConversations({ ...query.params, page: 1 });
+      if (!response || !response.data) return;
+
+      const { conversations } = extractConversationsData(response);
+      // ADD_CONVERSATION é upsert; do mais antigo ao mais novo mantém a ordem.
+      [...conversations].reverse().forEach(conv => {
+        dispatch({ type: 'ADD_CONVERSATION', payload: conv });
+      });
+    } catch (error) {
+      console.error('Erro ao ressincronizar conversas:', error);
+    }
+  }, []);
+
   const loadSpecificConversation = useCallback(
     async (conversationId: string): Promise<Conversation | null> => {
       const conversationKey = String(conversationId);
@@ -1056,6 +1080,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     state,
     loadConversations,
     loadMoreConversations,
+    refreshConversations,
     setConversations,
     loadSpecificConversation,
     selectConversation,
