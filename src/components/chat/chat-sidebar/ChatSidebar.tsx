@@ -16,7 +16,6 @@ import {
 } from '@evoapi/design-system/context-menu';
 import {
   Search,
-  Filter,
   Mail,
   MailOpen,
   MessageCircle,
@@ -55,7 +54,7 @@ import { ConversationSkeleton } from '../loading-states';
 import { NoConversations } from '../empty-states';
 import ContactAvatar from '../contact/ContactAvatar';
 import ConversationBadges from '../conversation/ConversationBadges';
-import ConversationsFilter from '../conversation/ConversationsFilter';
+import ConversationsFilterPopover from '../filters/ConversationsFilterPopover';
 import GlobalSearchPanel from '../search/GlobalSearchPanel';
 import { BaseFilter } from '@/types/core';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -1113,18 +1112,18 @@ const ChatSidebar = ({
               </Badge>
             )}
 
-            {/* Botão de filtros */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setFilterModalOpen(true)}
+            {/* Painel de filtros (acordeão, trigger próprio — igual ao layout oficial).
+                Status fica de fora: já é navegado pelas abas acima. */}
+            <ConversationsFilterPopover
+              open={filterModalOpen}
+              onOpenChange={setFilterModalOpen}
+              filters={conversationFilters}
+              onFiltersChange={setConversationFilters}
+              onApplyFilters={handleApplyFilters}
+              onClearFilters={handleClearFilters}
               disabled={filters.state.isApplyingFilters}
-              className="h-8 px-2 cursor-pointer"
-              data-tour="chat-filter-button"
-            >
-              <Filter className="h-4 w-4" />
-              {t('chatSidebar.filtersButton')}
-            </Button>
+              hideStatus
+            />
           </div>
         </div>
         {activeTab === 'resolved' && (
@@ -1364,14 +1363,6 @@ const ChatSidebar = ({
       </div>
 
       {/* Conversations Filter Modal */}
-      <ConversationsFilter
-        open={filterModalOpen}
-        onOpenChange={setFilterModalOpen}
-        filters={conversationFilters}
-        onFiltersChange={setConversationFilters}
-        onApplyFilters={handleApplyFilters}
-        onClearFilters={handleClearFilters}
-      />
     </div>
   );
 };

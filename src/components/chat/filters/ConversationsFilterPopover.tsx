@@ -20,6 +20,9 @@ interface ConversationsFilterPopoverProps {
   onApplyFilters: (filters: BaseFilter[]) => void;
   onClearFilters: () => void;
   disabled?: boolean;
+  // Esconde a seção de Status quando a navegação por status já existe em outro
+  // lugar (abas Atendendo/Aguardando/Fechados), evitando dois controles iguais.
+  hideStatus?: boolean;
 }
 
 // Uma seção por attributeKey. `multi: true` agrega vários valores no MESMO
@@ -87,6 +90,7 @@ const ConversationsFilterPopover: React.FC<ConversationsFilterPopoverProps> = ({
   onApplyFilters,
   onClearFilters,
   disabled = false,
+  hideStatus = false,
 }) => {
   const { t } = useLanguage('chat');
   const filterOptions = useFilterOptions({ enabled: open });
@@ -185,6 +189,7 @@ const ConversationsFilterPopover: React.FC<ConversationsFilterPopoverProps> = ({
             {/* Status é um card à parte (não faz parte do Accordion abaixo) por
                 ser o único com bolinha colorida por opção, em vez de checkbox
                 puro — visual ligeiramente diferente das demais seções. */}
+            {!hideStatus && (
             <Accordion type="multiple" value={openSections} onValueChange={setOpenSections}>
               <AccordionItem
                 value="status"
@@ -217,6 +222,7 @@ const ConversationsFilterPopover: React.FC<ConversationsFilterPopoverProps> = ({
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
+            )}
 
             {SECTIONS.map(section => {
               const IconComponent = section.icon;
