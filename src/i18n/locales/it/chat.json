@@ -712,7 +712,9 @@
         "fileTooLarge": "File troppo grande",
         "fileTooLargeDescription": "{{fileName}} supera il limite di {{maxSize}}MB",
         "fileTypeNotAllowed": "Tipo di file non consentito",
-        "fileTypeNotAllowedDescription": "{{fileName}} non è un tipo di file supportato"
+        "fileTypeNotAllowedDescription": "{{fileName}} non è un tipo di file supportato",
+        "tooManyFiles": "Massimo {{max}} file per invio su WhatsApp",
+        "someFilesFailed": "Alcuni file non sono stati inviati"
       },
       "success": {
         "fileAdded": "File aggiunto",

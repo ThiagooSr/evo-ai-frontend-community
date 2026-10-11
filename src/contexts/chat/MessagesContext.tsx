@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { createContext, useContext, useReducer, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { chatService } from '@/services/chat/chatService';
 import { useAuthStore } from '@/store/authStore';
@@ -427,6 +427,14 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage('chat');
   const [state, dispatch] = useReducer(messagesReducer, initialState);
 
+  // Reply lido via ref: num lote sequencial (WhatsApp, 1 arquivo = 1 mensagem) as
+  // chamadas seguintes ainda carregam o `state` da closure antiga — sem isso o
+  // in_reply_to seria repetido em todas as mensagens do lote.
+  const replyToMessageRef = useRef<Message | null>(state.replyToMessage);
+  useEffect(() => {
+    replyToMessageRef.current = state.replyToMessage;
+  }, [state.replyToMessage]);
+
   /**
    * TODO:
    * - Se a ideia é evitar duplicação por conversa/ação, teria que ser algo tipo: const key = `${action.type}-${conversationId}`;
@@ -592,8 +600,9 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
 
       // 1. 🔧 REPLY TO: Preparar content_attributes com in_reply_to se houver reply
       const contentAttributes: Record<string, unknown> = {};
-      if (state.replyToMessage?.id && !isPrivate) {
-        contentAttributes.in_reply_to = state.replyToMessage.id;
+      const replyToMessage = replyToMessageRef.current;
+      if (replyToMessage?.id && !isPrivate) {
+        contentAttributes.in_reply_to = replyToMessage.id;
       }
 
       // 2. Criar mensagem PENDING
@@ -687,7 +696,8 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
               });
 
         // 5. 🔧 REPLY TO: Limpar reply após envio bem-sucedido
-        if (state.replyToMessage) {
+        if (replyToMessageRef.current) {
+          replyToMessageRef.current = null;
           dispatch({ type: 'SET_REPLY_TO_MESSAGE', payload: null });
         }
 
@@ -751,7 +761,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
     },
-    [protectedDispatch, state.replyToMessage, t],
+    [protectedDispatch, t],
   );
 
   // Funções públicas (exporta via Context)

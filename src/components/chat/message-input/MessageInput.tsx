@@ -28,6 +28,11 @@ import { useAuth } from '@/contexts/AuthContext';
 
 import FileUpload from './FileUpload';
 import FilePreview from './FilePreview';
+import {
+  WHATSAPP_MAX_FILES_PER_SEND,
+  getMetaMediaSizeLimitMB,
+  planAttachmentSends,
+} from './attachmentSendPlan';
 import EmojiPicker from './EmojiPicker';
 import ComposerPlusMenu from './ComposerPlusMenu';
 import MacrosButton from './MacrosButton';
@@ -397,25 +402,59 @@ const MessageInput: React.FC<MessageInputProps> = ({
     setIsSending(true);
 
     try {
-      // Uploaded audio files are sent as-is. For WhatsApp, Baileys/EvoGo will mark
-      // them as PTT (Cloud already hardcodes voice:true). The browser recorder path
-      // delivers OGG/Opus directly via opus-recorder, so this fallback only matters
-      // when a user manually attaches a file (mp3/m4a/wav/etc.).
-      const filesToSend = selectedFiles;
-      const recordedAudioFilenames: string[] =
-        isWhatsApp ? selectedFiles.filter(f => f.type.startsWith('audio/')).map(f => f.name) : [];
-
-      await onSendMessage({
+      // WhatsApp entrega só 1 mídia por mensagem: N arquivos viram N mensagens,
+      // em sequência (ordem de seleção). Uma falha não aborta o resto do lote — o
+      // contexto já marca a bolha como failed e mostra o toast do erro.
+      const sends = planAttachmentSends({
         content: currentMessage,
-        files: filesToSend.length > 0 ? filesToSend : undefined,
-        isPrivate: false,
-        templateParams: undefined,
-        cannedResponseId: selectedCannedResponseId,
-        isRecordedAudio: recordedAudioFilenames.length > 0 ? recordedAudioFilenames : undefined,
+        files: selectedFiles,
+        splitPerFile: isWhatsApp,
       });
+      const failedFileNames: string[] = [];
+      let sentCount = 0;
+      let textFailed = false;
 
-      richEditorRef.current?.clear();
-      setCurrentEditorMessage('');
+      for (const [index, send] of sends.entries()) {
+        // Uploaded audio files are sent as-is. For WhatsApp, Baileys/EvoGo will mark
+        // them as PTT (Cloud already hardcodes voice:true). The browser recorder path
+        // delivers OGG/Opus directly via opus-recorder, so this fallback only matters
+        // when a user manually attaches a file (mp3/m4a/wav/etc.).
+        const recordedAudioFilenames: string[] =
+          isWhatsApp ? send.files.filter(f => f.type.startsWith('audio/')).map(f => f.name) : [];
+
+        try {
+          await onSendMessage({
+            content: send.content,
+            files: send.files.length > 0 ? send.files : undefined,
+            isPrivate: false,
+            templateParams: undefined,
+            cannedResponseId: index === 0 ? selectedCannedResponseId : null,
+            isRecordedAudio: recordedAudioFilenames.length > 0 ? recordedAudioFilenames : undefined,
+          });
+          sentCount += 1;
+        } catch (error) {
+          if (sends.length === 1) throw error;
+          console.error('Error sending message:', error);
+          failedFileNames.push(...send.files.map(f => f.name));
+          if (send.content) textFailed = true;
+        }
+      }
+
+      // Nada saiu: mantém texto e arquivos no composer pra nova tentativa.
+      if (sentCount === 0) return;
+
+      if (failedFileNames.length > 0) {
+        toast.error(t('messageInput.fileUpload.errors.someFilesFailed'), {
+          description: failedFileNames.join(', '),
+        });
+      }
+
+      // Se a mensagem que levava o texto (legenda ou texto avulso) falhou, o texto
+      // fica no editor — senão ele se perderia com o resto do lote já enviado.
+      if (!textFailed) {
+        richEditorRef.current?.clear();
+        setCurrentEditorMessage('');
+      }
       setSelectedFiles([]);
       setUploadProgress({});
 
@@ -510,12 +549,47 @@ const MessageInput: React.FC<MessageInputProps> = ({
     };
   }, [showCannedResponses]);
 
-  const handleFilesSelected = useCallback((files: File[]) => {
+  const handleFilesSelected = useCallback((incoming: File[]) => {
     if (hasCannedMedia) {
       toast.info(t('messageInput.cannedResponse.mediaBlocksManualUpload'));
       return;
     }
-    setSelectedFiles(prev => [...prev, ...files]);
+
+    let files = incoming;
+
+    // Limites da Meta Cloud API por tipo (imagem 5MB, vídeo/áudio 16MB, doc 100MB).
+    if (isWhatsAppCloud) {
+      files = files.filter(file => {
+        const maxSize = getMetaMediaSizeLimitMB(file);
+        if (file.size <= maxSize * 1024 * 1024) return true;
+        toast.error(t('messageInput.fileUpload.errors.fileTooLarge'), {
+          description: t('messageInput.fileUpload.errors.fileTooLargeDescription', {
+            fileName: file.name,
+            maxSize,
+          }),
+        });
+        return false;
+      });
+    }
+
+    // Cada arquivo vira uma mensagem no WhatsApp — limita o lote.
+    if (isWhatsApp) {
+      const remaining = Math.max(WHATSAPP_MAX_FILES_PER_SEND - selectedFiles.length, 0);
+      if (files.length > remaining) {
+        toast.warning(
+          t('messageInput.fileUpload.errors.tooManyFiles', { max: WHATSAPP_MAX_FILES_PER_SEND }),
+        );
+        files = files.slice(0, remaining);
+      }
+    }
+
+    if (files.length === 0) return;
+
+    // O slice no updater garante o teto mesmo com duas seleções no mesmo tick
+    // (ex.: paste + drop), quando `selectedFiles.length` acima ainda está velho.
+    setSelectedFiles(prev =>
+      isWhatsApp ? [...prev, ...files].slice(0, WHATSAPP_MAX_FILES_PER_SEND) : [...prev, ...files],
+    );
     const count = files.length;
     toast.success(
       count === 1
@@ -525,7 +599,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
         duration: 2000,
       },
     );
-  }, [t, hasCannedMedia]);
+  }, [t, hasCannedMedia, isWhatsApp, isWhatsAppCloud, selectedFiles.length]);
 
   // Handle media paste from clipboard (Ctrl+V / Cmd+V)
   useEffect(() => {
