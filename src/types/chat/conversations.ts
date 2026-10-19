@@ -60,7 +60,11 @@ export interface ConversationsContextValue {
     conversations: Conversation[],
     pagination: PaginationMeta,
     query?: ConversationsQuery,
-  ) => void;
+    /** From beginConversationsRequest(); a stale token is ignored. */
+    token?: number,
+  ) => boolean;
+  /** Marks a list load as the latest; pass the token to setConversations. */
+  beginConversationsRequest: () => number;
   loadSpecificConversation: (conversationId: string) => Promise<Conversation | null>;
   selectConversation: (conversationId: string | null) => void;
   updateConversationStatus: (

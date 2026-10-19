@@ -27,6 +27,7 @@ import { Contact, Conversation, ConversationListParams, ConversationsQuery } fro
 import { PaginationMeta } from '@/types/core';
 import { DEFAULT_PAGE_SIZE } from '@/constants/pagination';
 import { matchesConversationId } from '@/utils/chat/conversationMatcher';
+import { createLatestRequestGate, type LatestRequestGate } from '@/utils/chat/latestRequestGate';
 
 export function ConversationsProvider({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage('chat');
@@ -41,6 +42,9 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   // The query that produced the current list, so load-more replays the SAME
   // request for the next page instead of an unfiltered GET /conversations.
   const currentQueryRef = useRef<ConversationsQuery>({ kind: 'list', params: { status: 'open' } });
+  const listRequestGateRef = useRef<LatestRequestGate | null>(null);
+  listRequestGateRef.current ??= createLatestRequestGate();
+  const listGate = listRequestGateRef.current;
 
   const findConversationByAnyId = useCallback(
     (conversationId: string) => {
@@ -68,6 +72,13 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         dispatch({ type: 'SET_CONVERSATIONS_LOADING', payload: true });
       }
 
+      // A first-page load replaces the list: only the latest one issued may land
+      // (see latestRequestGate). An append page belongs to the current list and
+      // is dropped if a newer first-page load started meanwhile.
+      const token = isFirstPage ? listGate.begin() : listGate.current();
+      const isStale = () => !listGate.isLatest(token);
+      let nextQuery: ConversationsQuery | null = null;
+
       try {
         const shouldAppend = requestedPage > 1;
         const activeFilters = filtersState.activeFilters;
@@ -94,7 +105,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
               page: requestedPage,
             };
             if (!shouldAppend) {
-              currentQueryRef.current = { kind: 'filter', request: filterRequest };
+              nextQuery = { kind: 'filter', request: filterRequest };
             }
             response = await chatService.filterConversations(filterRequest);
           } else {
@@ -108,7 +119,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
             };
             if (!shouldAppend) {
               const { page, ...listParams } = getParams;
-              currentQueryRef.current = { kind: 'list', params: listParams };
+              nextQuery = { kind: 'list', params: listParams };
             }
             response = await chatService.getConversations(getParams);
           }
@@ -119,7 +130,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
               page: requestedPage,
             };
             if (!shouldAppend) {
-              currentQueryRef.current = { kind: 'filter', request: filterRequest };
+              nextQuery = { kind: 'filter', request: filterRequest };
             }
             response = await chatService.filterConversations(filterRequest);
           } else {
@@ -131,16 +142,23 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
             };
             if (!shouldAppend) {
               const { page, ...listParams } = getParams;
-              currentQueryRef.current = { kind: 'list', params: listParams };
+              nextQuery = { kind: 'list', params: listParams };
             }
             response = await chatService.getConversations(getParams);
           }
         } else {
           if (!shouldAppend) {
             const { page, ...listParams } = params ?? {};
-            currentQueryRef.current = { kind: 'list', params: listParams };
+            nextQuery = { kind: 'list', params: listParams };
           }
           response = await chatService.getConversations(params);
+        }
+
+        if (isStale()) {
+          return;
+        }
+        if (nextQuery) {
+          currentQueryRef.current = nextQuery;
         }
 
         if (!response || !response.data) {
@@ -169,6 +187,9 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
           },
         });
       } catch (error) {
+        if (isStale()) {
+          return;
+        }
         console.error('Erro ao carregar conversas da API:', error);
 
         const errorMessage =
@@ -195,7 +216,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         }
       }
     },
-    [t, filtersState.activeFilters, filtersState.searchTerm],
+    [t, filtersState.activeFilters, filtersState.searchTerm, listGate],
   );
 
   const loadMoreConversations = useCallback(async () => {
@@ -216,8 +237,13 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     if (query.kind === 'filter') {
       loadingRef.current = true;
       dispatch({ type: 'SET_CONVERSATIONS_LOADING', payload: true });
+      const token = listGate.current();
       try {
         const response = await chatService.filterConversations({ ...query.request, page: nextPage });
+        if (!listGate.isLatest(token)) {
+          dispatch({ type: 'SET_CONVERSATIONS_LOADING', payload: false });
+          return;
+        }
         const { conversations, pagination: nextPagination } = extractConversationsData(response);
         dispatch({ type: 'APPEND_CONVERSATIONS', payload: { conversations, pagination: nextPagination } });
       } catch (error) {
@@ -232,7 +258,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     }
 
     await loadConversations({ ...query.params, page: nextPage });
-  }, [state.conversationsPagination, state.conversationsLoading, loadConversations, t]);
+  }, [state.conversationsPagination, state.conversationsLoading, loadConversations, t, listGate]);
 
   // Rebusca silenciosamente a 1ª página da consulta atual e mescla na lista
   // (sem loading nem perder as páginas já carregadas). Usado para recuperar
@@ -241,11 +267,15 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     if (loadingRef.current) return;
 
     const query = currentQueryRef.current;
+    // A resync merges into the current list; if a new list load started while it
+    // was in flight, its rows belong to the previous query and must not land.
+    const token = listGate.current();
     try {
       const response =
         query.kind === 'filter'
           ? await chatService.filterConversations({ ...query.request, page: 1 })
           : await chatService.getConversations({ ...query.params, page: 1 });
+      if (!listGate.isLatest(token)) return;
       if (!response || !response.data) return;
 
       const { conversations } = extractConversationsData(response);
@@ -256,7 +286,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     } catch (error) {
       console.error('Erro ao ressincronizar conversas:', error);
     }
-  }, []);
+  }, [listGate]);
 
   const loadSpecificConversation = useCallback(
     async (conversationId: string): Promise<Conversation | null> => {
@@ -324,14 +354,22 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     [findConversationByAnyId, t],
   );
 
+  // Callers that load the list themselves (filters/search) take a token BEFORE
+  // the request and pass it here, so their response obeys the same gate.
+  const beginConversationsRequest = useCallback(() => listGate.begin(), [listGate]);
+
   const setConversations = useCallback(
-    (conversations: Conversation[], pagination: PaginationMeta, query?: ConversationsQuery) => {
+    (conversations: Conversation[], pagination: PaginationMeta, query?: ConversationsQuery, token?: number) => {
+      if (token !== undefined && !listGate.isLatest(token)) {
+        return false;
+      }
       if (query) {
         currentQueryRef.current = query;
       }
       dispatch({ type: 'SET_CONVERSATIONS', payload: { conversations, pagination } });
+      return true;
     },
-    [],
+    [listGate],
   );
 
   const selectConversation = useCallback(
@@ -1082,6 +1120,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     loadMoreConversations,
     refreshConversations,
     setConversations,
+    beginConversationsRequest,
     loadSpecificConversation,
     selectConversation,
     updateConversationStatus,

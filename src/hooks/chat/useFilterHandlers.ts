@@ -13,15 +13,22 @@ export const useFilterHandlers = () => {
       // Converter BaseFilter para ConversationFilter e aplicar
       const apiFilters = convertBaseFiltersToConversationFilters(newFilters);
 
+      // Token taken BEFORE the request: a list load issued earlier (e.g. the
+      // sidebar's mount load) can no longer overwrite this result when it lands later.
+      const token = conversations.beginConversationsRequest();
+
       return new Promise<void>((resolve, reject) => {
         filters.applyFilters(
           apiFilters,
           (conversationsResult, pagination, query) => {
             // Atualizar o estado das conversas com os resultados do filtro
-            conversations.setConversations(conversationsResult, pagination, query);
+            const applied = conversations.setConversations(conversationsResult, pagination, query, token);
 
-            // 💾 PERSISTIR: Salvar filtros aplicados no localStorage
-            saveConversationFilters(newFilters);
+            // 💾 PERSISTIR: só o filtro cujo resultado entrou na lista — um filtro
+            // superado por outro mais novo não pode virar o "salvo" do próximo F5.
+            if (applied) {
+              saveConversationFilters(newFilters);
+            }
             resolve();
           },
           error => {
@@ -47,10 +54,11 @@ export const useFilterHandlers = () => {
 
       // 🎯 FILTRO PADRÃO: recarregar a visão "Todas" pela MESMA via do pipeline
       // (applyFilters), mantendo activeFilters e a query em sincronia.
+      const token = conversations.beginConversationsRequest();
       await filters.applyFilters(
         [DEFAULT_FILTER],
         (conversationsResult, pagination, query) => {
-          conversations.setConversations(conversationsResult, pagination, query);
+          conversations.setConversations(conversationsResult, pagination, query, token);
         },
         error => {
           console.error('❌ Erro ao limpar filtros:', error);
@@ -66,10 +74,11 @@ export const useFilterHandlers = () => {
     try {
       // Se há filtros ativos, reaplicar
       if (filters.state.activeFilters.length > 0) {
+        const token = conversations.beginConversationsRequest();
         await filters.applyFilters(
           filters.state.activeFilters,
           (conversationsResult, pagination, query) => {
-            conversations.setConversations(conversationsResult, pagination, query);
+            conversations.setConversations(conversationsResult, pagination, query, token);
           },
           error => {
             console.error('❌ Erro ao recarregar filtros:', error);
@@ -78,10 +87,11 @@ export const useFilterHandlers = () => {
       }
       // Se há busca ativa, reaplicar busca
       else if (filters.state.searchTerm.trim().length > 0) {
+        const token = conversations.beginConversationsRequest();
         await filters.applySearch(
           filters.state.searchTerm,
           (conversationsResult, pagination, query) => {
-            conversations.setConversations(conversationsResult, pagination, query);
+            conversations.setConversations(conversationsResult, pagination, query, token);
           },
           error => {
             console.error('❌ Erro ao recarregar busca:', error);
@@ -90,10 +100,11 @@ export const useFilterHandlers = () => {
       }
       // 🎯 FILTRO PADRÃO: Se não há filtros nem busca, recarregar a visão "Todas".
       else {
+        const token = conversations.beginConversationsRequest();
         await filters.applyFilters(
           [DEFAULT_FILTER],
           (conversationsResult, pagination, query) => {
-            conversations.setConversations(conversationsResult, pagination, query);
+            conversations.setConversations(conversationsResult, pagination, query, token);
           },
           error => {
             console.error('❌ Erro ao recarregar filtros:', error);

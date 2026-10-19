@@ -12,8 +12,9 @@ const DEFAULT_FILTER = {
 };
 
 const mockConversations = vi.hoisted(() => ({
-  setConversations: vi.fn(),
+  setConversations: vi.fn(() => true),
   loadConversations: vi.fn().mockResolvedValue(undefined),
+  beginConversationsRequest: vi.fn(() => 7),
 }));
 
 const mockFilters = vi.hoisted(() => ({
@@ -73,5 +74,35 @@ describe('useFilterHandlers — handleClearFilters (EVO-1939)', () => {
       expect.any(Function),
     );
     expect(mockConversations.loadConversations).not.toHaveBeenCalled();
+  });
+});
+
+describe('useFilterHandlers — stale list responses', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('takes a request token before applying filters and hands it to setConversations', async () => {
+    mockFilters.applyFilters.mockImplementationOnce(async (_filters: any, onSuccess: any) => {
+      onSuccess([], { page: 1 }, { kind: 'filter', request: {} });
+    });
+    const { result } = renderHook(() => useFilterHandlers());
+
+    await result.current.handleApplyFilters([{ attributeKey: 'assignee_id' }] as any);
+
+    expect(mockConversations.beginConversationsRequest).toHaveBeenCalledTimes(1);
+    expect(mockConversations.setConversations).toHaveBeenCalledWith([], { page: 1 }, { kind: 'filter', request: {} }, 7);
+  });
+
+  it('does not persist a filter whose result was superseded by a newer request', async () => {
+    mockConversations.setConversations.mockReturnValueOnce(false);
+    mockFilters.applyFilters.mockImplementationOnce(async (_filters: any, onSuccess: any) => {
+      onSuccess([], { page: 1 }, { kind: 'filter', request: {} });
+    });
+    const { result } = renderHook(() => useFilterHandlers());
+
+    await result.current.handleApplyFilters([{ attributeKey: 'assignee_id' }] as any);
+
+    expect(mockStorage.saveConversationFilters).not.toHaveBeenCalled();
   });
 });

@@ -554,11 +554,10 @@ const ChatSidebar = ({
 
   const handleClearFilters = async () => {
     setConversationFilters([]);
+    // onFilterClear já recarrega a visão padrão (useFilterHandlers.handleClearFilters).
+    // Um reload extra aqui leria os filtros ANTIGOS da closure e, sendo a carga mais
+    // recente, reaplicaria o filtro recém-limpo.
     onFilterClear();
-    // Após limpar filtros, recarregar conversas da aba atual
-    setTimeout(() => {
-      conversations.loadConversations({ status: activeTab });
-    }, 50);
   };
 
   const [tabCounts, setTabCounts] = useState({ open: 0, pending: 0, resolved: 0 });

@@ -11,6 +11,11 @@ interface ErrorBoundaryState {
 interface ErrorBoundaryProps {
   children: React.ReactNode;
   fallback?: React.ComponentType<{ error?: Error; retry: () => void }>;
+  /**
+   * Changing it clears a caught error (e.g. a new URL inside the same page).
+   * Unlike `key`, it never remounts children that rendered fine.
+   */
+  resetKey?: string;
 }
 
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -25,6 +30,12 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+  }
+
+  componentDidUpdate(prevProps: ErrorBoundaryProps) {
+    if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false, error: undefined });
+    }
   }
 
   handleRetry = () => {

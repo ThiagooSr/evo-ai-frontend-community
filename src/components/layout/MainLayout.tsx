@@ -26,6 +26,7 @@ import { useVisualViewportBounds } from '@/hooks/useVisualViewportBounds';
 import { injectDashboardAppsIntoMenu } from '@/utils/injectDashboardApps';
 import { WelcomeTourModal } from '@/components/WelcomeTourModal';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { errorBoundaryKey } from './errorBoundaryKey';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -167,9 +168,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
         {/* Main Content */}
         <main className="flex-1 min-h-0 overflow-auto bg-background transition-colors duration-150 ease-in-out">
-          {/* Keyed by path so a crashed page does not keep the fallback up after navigating away */}
+          {/* Keyed by path so a crashed page does not keep the fallback up after navigating away
+              (except inside Conversations — see errorBoundaryKey) */}
           <div className="h-full">
-            <ErrorBoundary key={pathname}>{children}</ErrorBoundary>
+            <ErrorBoundary key={errorBoundaryKey(pathname)} resetKey={pathname}>
+              {children}
+            </ErrorBoundary>
           </div>
         </main>
 
